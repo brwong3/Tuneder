@@ -1,0 +1,46 @@
+# ==========================
+# GLOBAL / OS
+# ==========================
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log
+
+# ==========================
+# BACKEND (Python / FastAPI)
+# ==========================
+backend/__pycache__/
+backend/*.py[cod]
+backend/venv/
+backend/.venv/
+backend/env/
+backend/.env
+backend/build/
+backend/dist/
+backend/*.spec
+backend/.pytest_cache/
+backend/.coverage
+backend/htmlcov/
+
+# ==========================
+# FRONTEND (React Native / Expo)
+# ==========================
+client/node_modules/
+client/.expo/
+client/dist/
+client/web-build/
+client/.env
+client/.env.local
+client/npm-debug.log*
+client/yarn-debug.log*
+client/yarn-error.log*
+
+# Mobile Build Outputs
+client/android/app/build/
+client/android/app/src/main/assets/
+client/android/.gradle/
+client/ios/Pods/
+client/ios/build/
+client/*.jks
+client/*.keystore
