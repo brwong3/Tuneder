@@ -23,6 +23,10 @@ backend/.pytest_cache/
 backend/.coverage
 backend/htmlcov/
 
+# Generated Data Files (Ignore these!)
+backend/metadata.pkl
+backend/tuneder.index
+
 # ==========================
 # FRONTEND (React Native / Expo)
 # ==========================
