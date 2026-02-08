@@ -16,6 +16,12 @@ This project consists of a Python backend (FastAPI) for numerical processing and
 └── README.md
 ```
 
+# Index Setup
+
+1. Install the Spotify Tracks [here](https://www.kaggle.com/datasets/maharshipandya/-spotify-tracks-dataset?resource=download) and unzip it into a csv file 
+
+2. Wait until `index.py` is complete
+
 # Backend Setup
 
 1. Prerequisites
@@ -31,7 +37,7 @@ Open your terminal and navigate to the ```backend``` folder
 3. Install Dependencies
 
     ```text
-    pip install -r requirements
+    pip install -r requirements.txt
     ```
 
 4. Run the Server
@@ -60,3 +66,5 @@ Open your terminal and navigate to the ```backend``` folder
     ```text
     npx expo start
     ```
+
+
