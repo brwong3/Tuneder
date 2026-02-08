@@ -2,7 +2,7 @@ import React, { useMemo, useRef } from "react";
 import { View, Text, ImageBackground, StyleSheet, Pressable } from "react-native";
 import Swiper from "react-native-deck-swiper";
 
-type Card = {
+type Track = {
   id: string;
   title: string;
   artist: string;
@@ -14,9 +14,9 @@ const BG = "#0B0B0F";
 const PURPLE = "#7B61FF";
 
 export default function DiscoveryScreen() {
-  const swiperRef = useRef<Swiper<Card>>(null);
+  const swiperRef = useRef<Swiper<Track>>(null);
 
-  const cards = useMemo<Card[]>(
+  const cards = useMemo<Track[]>(
     () => [
       {
         id: "1",

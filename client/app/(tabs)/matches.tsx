@@ -1,6 +1,5 @@
-import React, { useMemo, useRef } from "react";
-import { View, Text, ImageBackground, StyleSheet, Pressable, FlatList } from "react-native";
-import Swiper from "react-native-deck-swiper";
+import React, { useMemo } from "react";
+import { View, Text, ImageBackground, StyleSheet, FlatList } from "react-native";
 
 type Track = {
   id: string;
@@ -19,16 +18,12 @@ export default function MatchesScreen() {
       { id: "1", title: "Blinding Lights", artist: "The Weeknd", album: "After Hours", imageUrl: "https://picsum.photos/900/1400?1", },
       { id: "2", title: "Bad Habits", artist: "Ed Sheeran", album: "=", imageUrl: "https://picsum.photos/900/1400?2", },
       { id: "3", title: "Levitating", artist: "Dua Lipa", album: "Future Nostalgia", imageUrl: "https://picsum.photos/900/1400?3", },
-      { id: "3", title: "Levitating", artist: "Dua Lipa", album: "Future Nostalgia", imageUrl: "https://picsum.photos/900/1400?3", },
-      { id: "3", title: "Levitating", artist: "Dua Lipa", album: "Future Nostalgia", imageUrl: "https://picsum.photos/900/1400?3", },
-      { id: "3", title: "Levitating", artist: "Dua Lipa", album: "Future Nostalgia", imageUrl: "https://picsum.photos/900/1400?3", },
-      { id: "3", title: "Levitating", artist: "Dua Lipa", album: "Future Nostalgia", imageUrl: "https://picsum.photos/900/1400?3", },
-      { id: "3", title: "Levitating", artist: "Dua Lipa", album: "Future Nostalgia", imageUrl: "https://picsum.photos/900/1400?3", },
-      { id: "3", title: "Levitating", artist: "Dua Lipa", album: "Future Nostalgia", imageUrl: "https://picsum.photos/900/1400?3", },
-      { id: "3", title: "Levitating", artist: "Dua Lipa", album: "Future Nostalgia", imageUrl: "https://picsum.photos/900/1400?3", },
-      { id: "3", title: "Levitating", artist: "Dua Lipa", album: "Future Nostalgia", imageUrl: "https://picsum.photos/900/1400?3", },
-      { id: "3", title: "Levitating", artist: "Dua Lipa", album: "Future Nostalgia", imageUrl: "https://picsum.photos/900/1400?3", },
-      { id: "3", title: "Levitating", artist: "Dua Lipa", album: "Future Nostalgia", imageUrl: "https://picsum.photos/900/1400?3", },
+      { id: "4", title: "Save Your Tears", artist: "The Weeknd", album: "After Hours", imageUrl: "https://picsum.photos/900/1400?4", },
+      { id: "6", title: "Good 4 U", artist: "Olivia Rodrigo", album: "SOUR", imageUrl: "https://picsum.photos/900/1400?6", },
+      { id: "8", title: "Peaches (feat. Daniel Caesar, Giveon)", artist: "Justin Bieber", album: "", imageUrl: "https://picsum.photos/900/1400?8", },
+      { id: "9", title: "Levitating", artist: "Dua Lipa", album: "Future Nostalgia", imageUrl: "https://picsum.photos/900/1400?3", },
+      { id: "10", title: "Heat Waves", artist: "Glass Animals", album: "Dreamland", imageUrl: "https://picsum.photos/900/1400?10", },
+      { id: "11", title: "As It Was", artist: "Harry Styles", album: "Harry's House", imageUrl: "https://picsum.photos/900/1400?11", },
     ],
     []
   );
@@ -62,13 +57,12 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: BG },
   card: {
     flex: 1,
-    borderRadius: 18,
     overflow: "hidden",
     justifyContent: "flex-end",
   },
-  cardImage: { borderRadius: 18 },
+  cardImage: { borderRadius: 0 },
   bottomFade: {
-    padding: 16,
+    padding: 8,
     backgroundColor: "rgba(0,0,0,0.35)",
   },
   title: { color: "white", fontSize: 24, fontWeight: "800" },
