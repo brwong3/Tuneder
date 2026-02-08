@@ -1,98 +1,126 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import React, { useMemo, useRef } from "react";
+import { View, Text, ImageBackground, StyleSheet, Pressable } from "react-native";
+import Swiper from "react-native-deck-swiper";
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+type Card = {
+  id: string;
+  title: string;
+  artist: string;
+  album?: string;
+  imageUrl: string;
+};
 
-export default function HomeScreen() {
+const BG = "#0B0B0F";
+const PURPLE = "#7B61FF";
+
+export default function DiscoveryScreen() {
+  const swiperRef = useRef<Swiper<Card>>(null);
+
+  const cards = useMemo<Card[]>(
+    () => [
+      {
+        id: "1",
+        title: "Blinding Lights",
+        artist: "The Weeknd",
+        album: "After Hours",
+        imageUrl: "https://picsum.photos/900/1400?1",
+      },
+      {
+        id: "2",
+        title: "Bad Habits",
+        artist: "Ed Sheeran",
+        album: "=",
+        imageUrl: "https://picsum.photos/900/1400?2",
+      },
+      {
+        id: "3",
+        title: "Levitating",
+        artist: "Dua Lipa",
+        album: "Future Nostalgia",
+        imageUrl: "https://picsum.photos/900/1400?3",
+      },
+    ],
+    []
+  );
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+    <View style={styles.screen}>
+      <Swiper
+        ref={swiperRef}
+        cards={cards}
+        cardIndex={0}
+        stackSize={2}
+        backgroundColor="transparent"
+        verticalSwipe={false} // usually feels better for “like/dislike”
+        renderCard={(card) => {
+          if (!card) return <View />;
+          return (
+            <ImageBackground source={{ uri: card.imageUrl }} style={styles.card} imageStyle={styles.cardImage}>
+              <View style={styles.bottomFade}>
+                <Text style={styles.title}>{card.title}</Text>
+                <Text style={styles.subtitle}>
+                  {card.artist}
+                  {card.album ? ` • ${card.album}` : ""}
+                </Text>
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+                <Pressable
+                  style={styles.playButton}
+                  onPress={() => {
+                    // TEMP: choose what your play button does
+                    // e.g., open modal, or just “like”
+                    swiperRef.current?.swipeRight();
+                  }}
+                >
+                  <Text style={styles.playText}>▶</Text>
+                </Pressable>
+              </View>
+            </ImageBackground>
+          );
+        }}
+        onSwiped={(newIndex) => {
+          // Called when *any* swipe happens; gives you the new card index
+          // Useful for prefetching
+        }}
+        onSwipedLeft={(index) => {
+          const card = cards[index];
+          console.log("NOPE:", card?.id);
+        }}
+        onSwipedRight={(index) => {
+          const card = cards[index];
+          console.log("LIKE:", card?.id);
+          // Save to global “liked” list
+        }}
+        onSwipedAll={() => {
+          console.log("All cards swiped");
+        }}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  screen: { flex: 1, backgroundColor: BG },
+  card: {
+    flex: 1,
+    borderRadius: 18,
+    overflow: "hidden",
+    justifyContent: "flex-end",
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  cardImage: { borderRadius: 18 },
+  bottomFade: {
+    padding: 16,
+    backgroundColor: "rgba(0,0,0,0.35)",
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  title: { color: "white", fontSize: 24, fontWeight: "800" },
+  subtitle: { color: "rgba(255,255,255,0.85)", marginTop: 6, fontSize: 14, fontWeight: "600" },
+  playButton: {
+    marginTop: 14,
+    height: 56,
+    borderRadius: 28,
+    alignSelf: "center",
+    paddingHorizontal: 22,
+    justifyContent: "center",
+    backgroundColor: PURPLE,
   },
+  playText: { color: "white", fontSize: 22, fontWeight: "900" },
 });
