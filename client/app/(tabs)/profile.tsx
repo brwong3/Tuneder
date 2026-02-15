@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { View, Text, ImageBackground, StyleSheet, FlatList } from "react-native";
+import { View, Text, StyleSheet, FlatList } from "react-native";
 import { IconSymbol } from '@/components/ui/icon-symbol';
 
 const BG = "#0B0B0F";

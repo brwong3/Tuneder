@@ -44,10 +44,8 @@ export default function TabLayout() {
           marginTop: 2,
         },
 
-        // Your existing nicety
         tabBarButton: HapticTab,
 
-        // Screen background (so you don’t get white flashes)
         sceneStyle: { backgroundColor: BG },
       }}
     >
