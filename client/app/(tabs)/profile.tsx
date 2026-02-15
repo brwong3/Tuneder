@@ -1,7 +1,6 @@
 import React, { useMemo } from "react";
 import { View, Text, ImageBackground, StyleSheet, FlatList } from "react-native";
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Background } from "@react-navigation/elements";
 
 const BG = "#0B0B0F";
 const TAB_BG = "#27272c";
@@ -28,7 +27,7 @@ export default function ProfileScreen() {
   );
 
   return (
-    <View style={[styles.screen, { alignItems: "center" }]}>
+    <View style={[styles.screen]}>
       <IconSymbol size={240} name="profile-person" color={WHITE} />
       <Text style={styles.title}>Welcome [Name]</Text>
       <FlatList
@@ -43,19 +42,16 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: BG },
-  card: {
+  screen: { 
     flex: 1,
-    borderRadius: 18,
-    overflow: "hidden",
-    justifyContent: "flex-end",
+    backgroundColor: BG,
+    alignItems: "center",
   },
-  cardImage: { borderRadius: 18 },
   bottomFade: {
-    padding: 16,
+    padding: 8,
     backgroundColor: "rgba(0,0,0,0.35)",
   },
-  title: { color: "white", fontSize: 24, fontWeight: "800" },
+  title: { color: "white", fontSize: 24, fontWeight: "800", alignSelf: "center" },
   tabName: { color: "rgba(255,255,255,0.85)", marginTop: 6, fontSize: 14, fontWeight: "600" },
   playButton: {
     marginTop: 14,

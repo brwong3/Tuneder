@@ -1,5 +1,6 @@
 import React, { useMemo } from "react";
 import { View, Text, ImageBackground, StyleSheet, FlatList } from "react-native";
+import { Background } from "@react-navigation/elements";
 
 type Track = {
   id: string;
@@ -27,9 +28,9 @@ export default function MatchesScreen() {
     ],
     []
   );
-
+  // image on the left, text on the right
   const trackRender = ({ item }: { item: Track }) => (
-    <ImageBackground source={{ uri: item.imageUrl }} style={styles.card} imageStyle={styles.cardImage}>
+    <Background style={styles.card}>
       <View style={styles.bottomFade}>
         <Text style={styles.title}>{item.title}</Text>
         <Text style={styles.subtitle}>
@@ -37,7 +38,16 @@ export default function MatchesScreen() {
           {item.album ? ` • ${item.album}` : ""}
         </Text>
       </View>
-    </ImageBackground>
+    </Background>
+    // <ImageBackground source={{ uri: item.imageUrl }} style={styles.card} imageStyle={styles.cardImage}>
+    //   <View style={styles.bottomFade}>
+    //     <Text style={styles.title}>{item.title}</Text>
+    //     <Text style={styles.subtitle}>
+    //       {item.artist}
+    //       {item.album ? ` • ${item.album}` : ""}
+    //     </Text>
+    //   </View>
+    // </ImageBackground>
   );
 
   return (

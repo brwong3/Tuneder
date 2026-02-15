@@ -51,7 +51,7 @@ export default function DiscoveryScreen() {
         cardIndex={0}
         stackSize={2}
         backgroundColor="transparent"
-        verticalSwipe={false} // usually feels better for “like/dislike”
+        verticalSwipe={false}
         renderCard={(card) => {
           if (!card) return <View />;
           return (
