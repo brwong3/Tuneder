@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { View, Text, ImageBackground, StyleSheet, FlatList } from "react-native";
+import { View, Text, Image, StyleSheet, FlatList, Pressable } from "react-native";
 import { Background } from "@react-navigation/elements";
 
 type Track = {
@@ -28,26 +28,20 @@ export default function MatchesScreen() {
     ],
     []
   );
-  // image on the left, text on the right
+
   const trackRender = ({ item }: { item: Track }) => (
-    <Background style={styles.card}>
-      <View style={styles.bottomFade}>
-        <Text style={styles.title}>{item.title}</Text>
-        <Text style={styles.subtitle}>
-          {item.artist}
-          {item.album ? ` • ${item.album}` : ""}
-        </Text>
-      </View>
-    </Background>
-    // <ImageBackground source={{ uri: item.imageUrl }} style={styles.card} imageStyle={styles.cardImage}>
-    //   <View style={styles.bottomFade}>
-    //     <Text style={styles.title}>{item.title}</Text>
-    //     <Text style={styles.subtitle}>
-    //       {item.artist}
-    //       {item.album ? ` • ${item.album}` : ""}
-    //     </Text>
-    //   </View>
-    // </ImageBackground>
+    <Pressable>
+      <Background style={styles.card}>
+        <Image source={{ uri: item.imageUrl }} style={styles.trackImage} />
+        <View style={styles.bottomFade}>
+          <Text style={styles.title}>{item.title}</Text>
+          <Text style={styles.subtitle}>
+            {item.artist}
+            {item.album ? ` • ${item.album}` : ""}
+          </Text>
+        </View>
+      </Background>
+    </Pressable>
   );
 
   return (
@@ -63,14 +57,22 @@ export default function MatchesScreen() {
   );
 }
 
+const IMAGE_SIZE = 80;
+
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: BG },
   card: {
     flex: 1,
+    flexDirection: "row",
     overflow: "hidden",
-    justifyContent: "flex-end",
+    // justifyContent: "flex-end",
   },
-  cardImage: { borderRadius: 0 },
+  trackImage: {
+    width: IMAGE_SIZE,
+    height: IMAGE_SIZE,
+    borderRadius: 0,
+    alignSelf: "flex-start",
+  },
   bottomFade: {
     padding: 8,
     backgroundColor: "rgba(0,0,0,0.35)",
