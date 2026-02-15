@@ -16,15 +16,14 @@ const PURPLE = "#7B61FF";
 export default function MatchesScreen() {
   const tracks = useMemo<Track[]>(
     () => [
-      { id: "1", title: "Blinding Lights", artist: "The Weeknd", album: "After Hours", imageUrl: "https://picsum.photos/900/1400?1", },
-      { id: "2", title: "Bad Habits", artist: "Ed Sheeran", album: "=", imageUrl: "https://picsum.photos/900/1400?2", },
-      { id: "3", title: "Levitating", artist: "Dua Lipa", album: "Future Nostalgia", imageUrl: "https://picsum.photos/900/1400?3", },
-      { id: "4", title: "Save Your Tears", artist: "The Weeknd", album: "After Hours", imageUrl: "https://picsum.photos/900/1400?4", },
-      { id: "6", title: "Good 4 U", artist: "Olivia Rodrigo", album: "SOUR", imageUrl: "https://picsum.photos/900/1400?6", },
-      { id: "8", title: "Peaches (feat. Daniel Caesar, Giveon)", artist: "Justin Bieber", album: "", imageUrl: "https://picsum.photos/900/1400?8", },
-      { id: "9", title: "Levitating", artist: "Dua Lipa", album: "Future Nostalgia", imageUrl: "https://picsum.photos/900/1400?3", },
-      { id: "10", title: "Heat Waves", artist: "Glass Animals", album: "Dreamland", imageUrl: "https://picsum.photos/900/1400?10", },
-      { id: "11", title: "As It Was", artist: "Harry Styles", album: "Harry's House", imageUrl: "https://picsum.photos/900/1400?11", },
+      { id: "1", title: "Blinding Lights", artist: "The Weeknd", album: "After Hours", imageUrl: "https://upload.wikimedia.org/wikipedia/en/e/e6/The_Weeknd_-_Blinding_Lights.png", },
+      { id: "2", title: "Bad Habits", artist: "Ed Sheeran", album: "=", imageUrl: "https://upload.wikimedia.org/wikipedia/en/c/cd/Ed_Sheeran_-_Equals.png", },
+      { id: "3", title: "Levitating", artist: "Dua Lipa", album: "Future Nostalgia", imageUrl: "https://upload.wikimedia.org/wikipedia/en/f/f5/Dua_Lipa_-_Future_Nostalgia_%28Official_Album_Cover%29.png", },
+      { id: "4", title: "Save Your Tears", artist: "The Weeknd", album: "After Hours", imageUrl: "https://upload.wikimedia.org/wikipedia/en/c/c1/The_Weeknd_-_After_Hours.png", },
+      { id: "5", title: "Good 4 U", artist: "Olivia Rodrigo", album: "SOUR", imageUrl: "https://upload.wikimedia.org/wikipedia/en/b/b2/Olivia_Rodrigo_-_SOUR.png", },
+      { id: "6", title: "Peaches (feat. Daniel Caesar, Giveon)", artist: "Justin Bieber", album: "Justice", imageUrl: "https://upload.wikimedia.org/wikipedia/en/0/08/Justin_Bieber_-_Justice.png", },
+      { id: "7", title: "Heat Waves", artist: "Glass Animals", album: "Dreamland", imageUrl: "https://upload.wikimedia.org/wikipedia/en/1/11/Dreamland_%28Glass_Animals%29.png", },
+      { id: "8", title: "As It Was", artist: "Harry Styles", album: "Harry's House", imageUrl: "https://upload.wikimedia.org/wikipedia/en/d/d5/Harry_Styles_-_Harry%27s_House.png", },
     ],
     []
   );
