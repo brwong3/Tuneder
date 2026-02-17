@@ -55,10 +55,10 @@ Open your terminal and navigate to the ```backend``` folder
 
 2. Install dependencies
     
-    Open a new terminal window, and navigate to ```frontend``` folder
+    Open a new terminal window, and navigate to ```client``` folder
 
     ```text
-    cd frontend
+    cd client
     npm install
     ```
 3. Run the App
