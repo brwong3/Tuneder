@@ -1,92 +1,65 @@
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-from typing import Dict, List
+import os
+import pickle
 import numpy as np
 import faiss
-import pandas as pd
-import pickle
-import os
+import httpx
+from fastapi import FastAPI, Request
 from contextlib import asynccontextmanager
+from dotenv import load_dotenv
 
-from index import (
-    build_tuneder_index, 
-    search_weighted_knn, 
-    INDEX_FILENAME, 
-    METADATA_FILENAME, 
-    SCALER_FILENAME
-)
+from index import build_tuneder_index 
+from routers.recommend import router as api_router 
+from fastapi.middleware.cors import CORSMiddleware
 
-state = {}
+load_dotenv()
+
+REQUIRED_FILES = ["tuneder.index", "track_ids.npy", "scaler.pkl"]
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    files_exist = (
-        os.path.exists(INDEX_FILENAME) and 
-        os.path.exists(METADATA_FILENAME) and 
-        os.path.exists(SCALER_FILENAME)
-    )
-
-    if not files_exist:
+    print("🚀 Tuneder API is starting up...")
+    
+    app.state.client = httpx.AsyncClient(timeout=10.0)
+    
+    missing_files = [f for f in REQUIRED_FILES if not os.path.exists(f)]
+    if missing_files:
+        print(f"⚠️ Missing index files: {missing_files}. Building now...")
         build_tuneder_index()
 
-    state["index"] = faiss.read_index(INDEX_FILENAME)
-    state["metadata"] = pd.read_pickle(METADATA_FILENAME)
+    try:
+        app.state.index = faiss.read_index("tuneder.index")
+        app.state.ids = np.load("track_ids.npy", allow_pickle=True)
+        with open("scaler.pkl", "rb") as f:
+            app.state.scaler = pickle.load(f)
+        print("✅ FAISS Index & Scaler Loaded.")
+    except Exception as e:
+        print(f"❌ Startup Failure: {e}")
+        raise
 
-    with open(SCALER_FILENAME, 'rb') as f:
-        state["scaler"] = pickle.load(f)
-        
     yield
-    state.clear()
+    
+    await app.state.client.aclose()
+    print("🛑 Tuneder API shut down.")
 
-app = FastAPI(lifespan=lifespan)
-
-class RandomQuery(BaseModel):
-    k: int = 5
-    weights: Dict[str, float] = {} 
-
-class ContextQuery(BaseModel):
-    feature_averages: List[float] 
-    weights: Dict[str, float] = {}
-    k: int = 5
+app = FastAPI(title="Tuneder API", lifespan=lifespan)
 
 @app.get("/")
-def home():
-    if state["index"] is None:
-        return {"status": "error"}
-    return {"status": "ready", "tracks_loaded": state["index"].ntotal}
+async def health_check(request: Request):
+    return {
+        "status": "online",
+        "tracks_indexed": request.app.state.index.ntotal if hasattr(request.app.state, 'index') else 0
+    }
 
-@app.post("/recommend/random")
-def get_random_music(query: RandomQuery):
-    index = state["index"]
-    
-    random_idx = np.random.randint(0, index.ntotal)
-    
-    all_vectors = faiss.rev_swig_ptr(index.get_xb(), index.ntotal * index.d).reshape(index.ntotal, index.d)
-    seed_vector = all_vectors[random_idx]
+app.include_router(api_router, prefix="/api")
 
-    results = search_weighted_knn(
-        target_vector=seed_vector,
-        weight_dict=query.weights,
-        k=query.k,
-        index_obj=state["index"],
-        scaler_obj=state["scaler"],
-        metadata_obj=state["metadata"],
-        is_raw_input=False 
-    )
-    return results
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # In production, replace with specific IP/Domain
+    allow_credentials=True,
+    allow_methods=["*"], # This allows the OPTIONS, POST, GET, etc.
+    allow_headers=["*"], # This allows the 'Content-Type' and 'Authorization' headers
+)
 
-@app.post("/recommend/context")
-def get_contextual_music(query: ContextQuery):
-    if len(query.feature_averages) != 12:
-        raise HTTPException(status_code=400, detail="Vector length mismatch")
-
-    results = search_weighted_knn(
-        target_vector=query.feature_averages,
-        weight_dict=query.weights,
-        k=query.k,
-        index_obj=state["index"],
-        scaler_obj=state["scaler"],
-        metadata_obj=state["metadata"],
-        is_raw_input=True   
-    )
-    return results
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
