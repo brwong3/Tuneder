@@ -38,8 +38,16 @@ Open your terminal and navigate to the ```backend``` folder
 
     ```text
     pip install -r requirements.txt
-    ```
 
+4. Spotify Setup
+    - Login to [here](https://developer.spotify.com) and create an App
+        - Redirect URIs: http://127.0.0.1:8000/callback
+        - APIs used: Web API
+    - Create a file named  `.env` inside the `backend` folder.
+
+    ```text
+    CLIENT_ID=your_spotify_client_id_here
+    CLIENT_SECRET=your_spotify_client_secret_here
 4. Run the Server
 
     ```text
