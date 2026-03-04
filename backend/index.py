@@ -7,6 +7,7 @@ from sklearn.preprocessing import MinMaxScaler
 CSV_PATH = "dataset.csv"
 INDEX_FILENAME = "tuneder.index"
 IDS_FILENAME = "track_ids.npy"
+GENRES_FILENAME = "track_genres.npy" 
 SCALER_FILENAME = "scaler.pkl"
 
 FEATURE_MAPPING = {
@@ -21,8 +22,9 @@ def build_tuneder_index():
     csv.drop_duplicates(subset=["track_id"], inplace=True)
     csv.reset_index(drop=True, inplace=True)
 
-    # Save ONLY the track IDs as a numpy array
     np.save(IDS_FILENAME, csv["track_id"].values)
+
+    np.save(GENRES_FILENAME, csv["track_genre"].values)
 
     raw_features = csv.iloc[:, 7:19].values.astype('float32')
     scaler = MinMaxScaler()

@@ -14,7 +14,6 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        // Header (top bar)
         headerShown: true,
         headerTitle: "Tuneder",
         headerTitleAlign: "center",
@@ -27,7 +26,6 @@ export default function TabLayout() {
         },
         headerShadowVisible: false,
 
-        // Tab bar (bottom)
         tabBarStyle: {
           backgroundColor: BG_ELEV,
           borderTopColor: "rgba(255,255,255,0.08)",
@@ -45,7 +43,6 @@ export default function TabLayout() {
         },
 
         tabBarButton: HapticTab,
-
         sceneStyle: { backgroundColor: BG },
       }}
     >
@@ -54,7 +51,7 @@ export default function TabLayout() {
         options={{
           title: "Discovery",
           tabBarIcon: ({ color }) => (
-            <IconSymbol size={26} name="discovery-fire" color={color} />
+            <IconSymbol size={26} name="flame.fill" color={color} />
           ),
         }}
       />
@@ -63,7 +60,7 @@ export default function TabLayout() {
         options={{
           title: "Matches",
           tabBarIcon: ({ color }) => (
-            <IconSymbol size={26} name="library-music" color={color} />
+            <IconSymbol size={26} name="music.note.list" color={color} />
           ),
         }}
       />
@@ -72,7 +69,7 @@ export default function TabLayout() {
         options={{
           title: "Profile",
           tabBarIcon: ({ color }) => (
-            <IconSymbol size={26} name="profile-person" color={color} />
+            <IconSymbol size={26} name="person.crop.circle.fill" color={color} />
           ),
         }}
       />

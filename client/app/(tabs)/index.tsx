@@ -1,6 +1,8 @@
-import React, { useRef, useState, useEffect } from "react";
-import { View, Text, ImageBackground, StyleSheet, Pressable, ActivityIndicator, Dimensions } from "react-native";
+import React, { useRef, useState, useEffect, createContext, useContext } from "react";
+import { View, Text, ImageBackground, StyleSheet, ActivityIndicator, Dimensions } from "react-native";
 import Swiper from "react-native-deck-swiper";
+import { Audio } from "expo-av";
+import { Ionicons } from '@expo/vector-icons';
 import { BASE_URL } from "../../constants/api";
 
 const { width, height } = Dimensions.get("window");
@@ -12,17 +14,67 @@ type Track = {
   album: string;
   image: string;
   genre: string;
+  preview_url: string; 
 };
 
 const BG = "#0B0B0F";
 const PURPLE = "#7B61FF";
 
+const PlaybackContext = createContext({ playingId: null as string | null });
+
+const TrackCard = ({ card }: { card: Track | null }) => {
+  const { playingId } = useContext(PlaybackContext);
+  
+  if (!card) return <View style={styles.emptyCard} />;
+
+  const isPlaying = playingId === card.id;
+
+  return (
+    <ImageBackground source={{ uri: card.image }} style={styles.card} imageStyle={styles.cardImage}>
+      <View style={styles.overlay}>
+        <View style={styles.genreTag}>
+          <Text style={styles.genreText}>{card.genre.toUpperCase()}</Text>
+        </View>
+        
+        <View style={styles.bottomSection}>
+          <View style={styles.metaContainer}>
+            <Text style={styles.title} numberOfLines={1}>{card.title}</Text>
+            <Text style={styles.subtitle} numberOfLines={1}>{card.artist}</Text>
+          </View>
+
+          <View style={styles.playPauseButton}>
+            <Ionicons 
+              name={isPlaying ? "pause" : "play"} 
+              size={24} 
+              color="white" 
+              style={{ marginLeft: isPlaying ? 0 : 3 }} 
+            />
+          </View>
+        </View>
+      </View>
+    </ImageBackground>
+  );
+};
+
+
 export default function DiscoveryScreen() {
   const swiperRef = useRef<Swiper<Track>>(null);
   const [cards, setCards] = useState<Track[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
+
+  const [playingId, setPlayingId] = useState<string | null>(null);
+  const [sound, setSound] = useState<Audio.Sound | null>(null);
+
+  useEffect(() => {
+    Audio.setAudioModeAsync({
+      playsInSilentModeIOS: true,
+      staysActiveInBackground: false,
+      shouldDuckAndroid: true,
+    });
+    fetchMusicBatch();
+  }, []);
 
   const fetchMusicBatch = async (isPrefetch = false) => {
     if (isPrefetch) setIsFetchingMore(true);
@@ -52,14 +104,75 @@ export default function DiscoveryScreen() {
     }
   };
 
-  useEffect(() => { fetchMusicBatch(); }, []);
+  useEffect(() => {
+    const currentCard = cards[currentIndex];
+    if (!currentCard || !currentCard.preview_url) return;
+
+    let isMounted = true;
+    let localSound: Audio.Sound | null = null;
+
+    const loadAndPlay = async () => {
+      try {
+        const { sound: newSound } = await Audio.Sound.createAsync(
+          { uri: currentCard.preview_url },
+          { shouldPlay: true, isLooping: true }
+        );
+
+        if (isMounted) {
+          setSound(newSound);
+          localSound = newSound;
+          
+          newSound.setOnPlaybackStatusUpdate((status) => {
+            if (status.isLoaded) {
+              setPlayingId(status.isPlaying ? currentCard.id : null);
+            }
+          });
+
+          const initialStatus = await newSound.getStatusAsync();
+          if (initialStatus.isLoaded) {
+             setPlayingId(initialStatus.isPlaying ? currentCard.id : null);
+          }
+        } else {
+          await newSound.unloadAsync();
+        }
+      } catch (error) {
+        console.warn("Autoplay blocked by browser or playback error:", error);
+        if (isMounted) setPlayingId(null); 
+      }
+    };
+
+    loadAndPlay();
+
+    return () => {
+      isMounted = false;
+      if (localSound) {
+        localSound.setOnPlaybackStatusUpdate(null);
+        localSound.stopAsync();
+        localSound.unloadAsync();
+      }
+      setPlayingId(null); 
+    };
+  }, [currentIndex, cards]);
+
+  const togglePlayback = async () => {
+    if (!sound) return;
+    
+    const status = await sound.getStatusAsync();
+    if (!status.isLoaded) return;
+
+    if (status.isPlaying) {
+      await sound.pauseAsync();
+    } else {
+      await sound.playAsync();
+    }
+  };
 
   const handleOnSwiped = (cardIndex: number) => {
+    setCurrentIndex(cardIndex + 1);
     const cardsLeft = cards.length - (cardIndex + 1);
     if (cardsLeft <= 3 && !isFetchingMore) {
       fetchMusicBatch(true);
     }
-    setIsPlaying(false); // Reset to "Play" icon for the new card
   };
 
   if (loading) {
@@ -71,48 +184,28 @@ export default function DiscoveryScreen() {
   }
 
   return (
-    <View style={styles.screen}>
-      <Swiper
-        ref={swiperRef}
-        cards={cards}
-        cardIndex={0}
-        stackSize={2}
-        backgroundColor="transparent"
-        verticalSwipe={false}
-        animateCardOpacity
-        onSwiped={handleOnSwiped}
-        renderCard={(card) => {
-          if (!card) return <View style={styles.emptyCard} />;
-          return (
-            <ImageBackground source={{ uri: card.image }} style={styles.card} imageStyle={styles.cardImage}>
-              <View style={styles.overlay}>
-                {/* Genre Tag */}
-                <View style={styles.genreTag}>
-                  <Text style={styles.genreText}>{card.genre.toUpperCase()}</Text>
-                </View>
-                
-                {/* Bottom Metadata & Controls */}
-                <View style={styles.bottomSection}>
-                  <View style={styles.metaContainer}>
-                    <Text style={styles.title} numberOfLines={1}>{card.title}</Text>
-                    <Text style={styles.subtitle} numberOfLines={1}>{card.artist}</Text>
-                  </View>
-
-                  <Pressable 
-                    style={styles.playPauseCircle}
-                    onPress={() => setIsPlaying(!isPlaying)}
-                  >
-                    <Text style={styles.iconText}>
-                      {isPlaying ? "┃┃" : "▶"}
-                    </Text>
-                  </Pressable>
-                </View>
-              </View>
-            </ImageBackground>
-          );
-        }}
-      />
-    </View>
+    <PlaybackContext.Provider value={{ playingId }}>
+      <View style={styles.screen}>
+        <Swiper
+          ref={swiperRef}
+          cards={cards}
+          cardIndex={currentIndex}
+          stackSize={2}
+          backgroundColor="transparent"
+          verticalSwipe={false}
+          animateCardOpacity
+          onSwiped={handleOnSwiped}
+          onTapCard={togglePlayback}
+          marginTop={0.00625 * height}
+          marginBottom={0}
+          cardVerticalMargin={0}
+          cardHorizontalMargin={0}
+          renderCard={(card) => {
+            return <TrackCard card={card} />;
+          }}
+        />
+      </View>
+    </PlaybackContext.Provider>
   );
 }
 
@@ -120,7 +213,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: BG },
   centered: { flex: 1, backgroundColor: BG, justifyContent: "center", alignItems: "center" },
   card: {
-    width: width * 0.94, // Ultra-wide (94% width)
+    width: width * 0.94,
     height: height * 0.75,
     borderRadius: 24,
     overflow: "hidden",
@@ -133,43 +226,39 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 24,
     justifyContent: "space-between",
-    backgroundColor: "rgba(0,0,0,0.15)", // Subtle dark wash
+    backgroundColor: "rgba(0,0,0,0.2)",
   },
   genreTag: {
-    backgroundColor: "rgba(255, 255, 255, 0.15)",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
+    backgroundColor: "rgba(255, 255, 255, 0.25)",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
     alignSelf: 'flex-start',
-    borderWidth: 0.5,
-    borderColor: "rgba(255, 255, 255, 0.2)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.3)",
   },
-  genreText: { color: "white", fontSize: 10, fontWeight: "700", letterSpacing: 1 },
+  genreText: { color: "white", fontSize: 10, fontWeight: "800", letterSpacing: 1.2 },
   bottomSection: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: "rgba(0,0,0,0.7)",
+    backgroundColor: "rgba(0,0,0,0.6)",
     padding: 20,
-    borderRadius: 20,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)", 
   },
   metaContainer: { flex: 1, marginRight: 15 },
-  title: { color: "white", fontSize: 22, fontWeight: "900" },
-  subtitle: { color: "rgba(255,255,255,0.6)", fontSize: 14, fontWeight: "500", marginTop: 2 },
-  playPauseCircle: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: "white",
+  title: { color: "white", fontSize: 24, fontWeight: "900" },
+  subtitle: { color: "rgba(255,255,255,0.7)", fontSize: 15, fontWeight: "600", marginTop: 4 },
+  playPauseButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: "rgba(255, 255, 255, 0.15)",
     justifyContent: "center",
     alignItems: "center",
-    elevation: 4,
-  },
-  iconText: {
-    fontSize: 20,
-    color: BG,
-    textAlign: "center",
-    fontWeight: "800",
-    marginLeft: 2,
-  },
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.3)",
+  }
 });

@@ -9,11 +9,13 @@ from dotenv import load_dotenv
 
 from index import build_tuneder_index 
 from routers.recommend import router as api_router 
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.cors import CORSMiddleware    
+import uvicorn
+
 
 load_dotenv()
 
-REQUIRED_FILES = ["tuneder.index", "track_ids.npy", "scaler.pkl"]
+REQUIRED_FILES = ["tuneder.index", "track_ids.npy", "scaler.pkl", "track_genres.npy"]
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -29,9 +31,11 @@ async def lifespan(app: FastAPI):
     try:
         app.state.index = faiss.read_index("tuneder.index")
         app.state.ids = np.load("track_ids.npy", allow_pickle=True)
+        app.state.genres = np.load("track_genres.npy", allow_pickle=True) 
+        
         with open("scaler.pkl", "rb") as f:
             app.state.scaler = pickle.load(f)
-        print("✅ FAISS Index & Scaler Loaded.")
+        print("✅ FAISS Index, IDs, Genres, & Scaler Loaded.")
     except Exception as e:
         print(f"❌ Startup Failure: {e}")
         raise
@@ -54,12 +58,11 @@ app.include_router(api_router, prefix="/api")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # In production, replace with specific IP/Domain
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"], # This allows the OPTIONS, POST, GET, etc.
-    allow_headers=["*"], # This allows the 'Content-Type' and 'Authorization' headers
+    allow_methods=["*"], 
+    allow_headers=["*"], 
 )
 
 if __name__ == "__main__":
-    import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

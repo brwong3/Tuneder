@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { View, Text, StyleSheet, FlatList } from "react-native";
+import { View, Text, StyleSheet, FlatList, Pressable } from "react-native";
 import { IconSymbol } from '@/components/ui/icon-symbol';
 
 const BG = "#0B0B0F";
@@ -20,22 +20,38 @@ export default function ProfileScreen() {
     { id: "3", name: "Logout", link: "/logout" },
   ], []);
 
+  const handlePress = (link: string) => {
+    console.log("Navigating to:", link);
+  };
+
   const tabRender = ({ item }: { item: Tab }) => (
-    <View style={[styles.bottomFade, { backgroundColor: TAB_BG, padding: 16 }]}>
-      <Text style={styles.title}>{item.name}</Text>
-    </View>
+    <Pressable 
+      style={({ pressed }) => [
+        styles.tabContainer, 
+        { opacity: pressed ? 0.7 : 1 }
+      ]}
+      onPress={() => handlePress(item.link)}
+    >
+      <Text style={styles.tabText}>{item.name}</Text>
+      
+      <IconSymbol size={20} name="chevron.right" color="rgba(255,255,255,0.4)" />
+    </Pressable>
   );
 
   return (
-    <View style={[styles.screen]}>
-      <IconSymbol size={240} name="profile-person" color={WHITE} />
-      <Text style={styles.title}>Welcome [Name]</Text>
+    <View style={styles.screen}>
+      <View style={styles.header}>
+        <IconSymbol size={120} name="person.crop.circle.fill" color={WHITE} />
+        <Text style={styles.title}>Welcome User</Text>
+      </View>
+
       <FlatList
         data={tabs}
         keyExtractor={(item) => item.id}
-        renderItem={ tabRender }
-        contentContainerStyle={{ padding: 16 }}
-        ItemSeparatorComponent={() => <View style={{ height: 16 }} />}
+        renderItem={tabRender}
+        style={styles.list}
+        contentContainerStyle={styles.listContent}
+        ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
       />
     </View>
   );
@@ -45,22 +61,37 @@ const styles = StyleSheet.create({
   screen: { 
     flex: 1,
     backgroundColor: BG,
+  },
+  header: {
     alignItems: "center",
+    marginTop: 60,
+    marginBottom: 40,
   },
-  bottomFade: {
-    padding: 8,
-    backgroundColor: "rgba(0,0,0,0.35)",
+  title: { 
+    color: "white", 
+    fontSize: 28, 
+    fontWeight: "800", 
+    marginTop: 16,
   },
-  title: { color: "white", fontSize: 24, fontWeight: "800", alignSelf: "center" },
-  tabName: { color: "rgba(255,255,255,0.85)", marginTop: 6, fontSize: 14, fontWeight: "600" },
-  playButton: {
-    marginTop: 14,
-    height: 56,
-    borderRadius: 28,
-    alignSelf: "center",
-    paddingHorizontal: 22,
-    justifyContent: "center",
-    backgroundColor: PURPLE,
+  list: {
+    width: "100%", // Forces the list to span the full screen width
   },
-  playText: { color: "white", fontSize: 22, fontWeight: "900" },
+  listContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: TAB_BG,
+    paddingVertical: 20,
+    paddingHorizontal: 24,
+    borderRadius: 16, // Smoothed out the edges for a modern look
+  },
+  tabText: { 
+    color: "white", 
+    fontSize: 16, 
+    fontWeight: "600" 
+  },
 });
