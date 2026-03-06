@@ -1,6 +1,22 @@
 import React, { useMemo } from "react";
 import { View, Text, Image, StyleSheet, FlatList, Pressable } from "react-native";
 import { Background } from "@react-navigation/elements";
+import { getLikedSongs } from '../../services/storage';
+import { fetchRecommendationsFromLikes } from "../../services/storage";
+
+const setSongs = (songs) => {
+  // This is where you'd set the state in your component to update the UI with the new recommendations
+  console.log("Recommended songs based on your likes:", songs);
+}
+
+const loadRecs = async () => {
+  const myLikes = await getLikedSongs();
+  if (myLikes.length > 0) {
+    // Send to your FastAPI /features_by_ids endpoint
+    const recommendations = await fetchRecommendationsFromLikes(myLikes);
+    setSongs(recommendations);
+  }
+};
 
 type Track = {
   id: string;
@@ -14,6 +30,7 @@ const BG = "#0B0B0F";
 const PURPLE = "#7B61FF";
 
 export default function MatchesScreen() {
+  loadRecs();
   const tracks = useMemo<Track[]>(
     () => [
       { id: "1", title: "Blinding Lights", artist: "The Weeknd", album: "After Hours", imageUrl: "https://upload.wikimedia.org/wikipedia/en/e/e6/The_Weeknd_-_Blinding_Lights.png", },
