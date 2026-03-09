@@ -24,7 +24,7 @@ type Track = {
   title: string;
   artist: string;
   album?: string;
-  imageUrl: string;
+  image: string; // matches backend field
 };
 
 const BG = "#0B0B0F";
@@ -50,7 +50,7 @@ export default function MatchesScreen() {
   const trackRender = ({ item }: { item: Track }) => (
     <Pressable>
       <Background style={styles.card}>
-        <Image source={{ uri: item.imageUrl }} style={styles.trackImage} />
+        <Image source={{ uri: item.image }} style={styles.trackImage} />
         <View style={styles.bottomFade}>
           <Text style={styles.title}>{item.title}</Text>
           <Text style={styles.subtitle}>
