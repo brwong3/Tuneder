@@ -3,6 +3,18 @@ import { BASE_URL } from "../constants/api";
 
 const LIKED_SONGS_KEY = '@liked_songs_ids';
 
+// simple listener list for liked-song changes
+const likedSongsListeners: Array<() => void> = [];
+
+export const addLikedSongsListener = (listener: () => void) => {
+  likedSongsListeners.push(listener);
+};
+
+export const removeLikedSongsListener = (listener: () => void) => {
+  const idx = likedSongsListeners.indexOf(listener);
+  if (idx !== -1) likedSongsListeners.splice(idx, 1);
+};
+
 /**
  * Persistently stores the list of liked track IDs.
  */
@@ -11,6 +23,8 @@ export const saveLikedSongs = async (ids: string[]): Promise<void> => {
     const jsonValue = JSON.stringify(ids);
     console.log("Saving liked songs:", ids);
     await AsyncStorage.setItem(LIKED_SONGS_KEY, jsonValue);
+    // notify listeners that liked list changed
+    likedSongsListeners.forEach((cb) => cb());
   } catch (e) {
     console.error("Error saving liked songs", e);
   }
@@ -32,12 +46,26 @@ export const getLikedSongs = async (): Promise<string[]> => {
 export const fetchRecommendationsFromLikes = async (likedIds) => {
   try {
     // 1. Get the raw audio features for your liked songs
+    // API expects a raw array of IDs (FastAPI declaration: List[str])
     const featureRes = await fetch(`${BASE_URL}/features_by_ids`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ track_ids: likedIds })
+      body: JSON.stringify(likedIds)
     });
-    const { features } = await featureRes.json();
+
+    if (!featureRes.ok) {
+      console.error('features_by_ids failed', featureRes.status, await featureRes.text());
+      return [];
+    }
+
+    const featureJson = await featureRes.json();
+    console.log("/features_by_ids response:", featureJson);
+
+    // make sure we have an array
+    const features = Array.isArray(featureJson.features) ? featureJson.features : [];
+
+    // print type of features and first few entries for debugging
+    console.log("Fetched features for liked songs (sanitized):", typeof features, features.length);
 
     // 2. Average the vectors (Standard Linear Algebra approach)
     if (features.length === 0) return [];

@@ -1,11 +1,10 @@
 import React, { useRef, useState, useEffect, createContext, useContext } from "react";
 import { View, Text, ImageBackground, StyleSheet, ActivityIndicator, Dimensions } from "react-native";
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import Swiper from "react-native-deck-swiper";
 import { Audio } from "expo-av";
 import { Ionicons } from '@expo/vector-icons';
 import { BASE_URL } from "../../constants/api";
-import { saveLikedSongs } from '../../services/storage';
+import { saveLikedSongs, getLikedSongs } from '../../services/storage';
 
 const { width, height } = Dimensions.get("window");
 
@@ -29,21 +28,13 @@ const LIKED_SONGS_KEY = '@liked_songs_ids';
 export const useLikedSongs = () => {
   const [likedIds, setLikedIds] = useState<string[]>([]);
 
-  // TODO: remove later
-  // remove all liked songs for testing
-  useEffect(() => {
-    const clearLikedSongs = async () => {
-      await AsyncStorage.removeItem(LIKED_SONGS_KEY);
-      setLikedIds([]);
-    };
-    clearLikedSongs();
-  }, []);
+  // NOTE: initialization happens in the next effect, no need to clear on startup
 
   // Load liked songs on startup
   useEffect(() => {
     const loadSongs = async () => {
-      const stored = await AsyncStorage.getItem(LIKED_SONGS_KEY);
-      if (stored) setLikedIds(JSON.parse(stored));
+      const stored = await getLikedSongs();
+      setLikedIds(stored);
     };
     loadSongs();
   }, []);
@@ -57,7 +48,8 @@ export const useLikedSongs = () => {
     }
 
     setLikedIds(updatedIds);
-    await AsyncStorage.setItem(LIKED_SONGS_KEY, JSON.stringify(updatedIds));
+    // persist via shared helper so listeners fire
+    await saveLikedSongs(updatedIds);
   };
 
   return { likedIds, toggleLike };
@@ -221,16 +213,8 @@ export default function DiscoveryScreen() {
   const handleOnSwipedRight = async (cardIndex: number) => {
     const likedTrack = cards[cardIndex];
 
-    // figure out the new list of liked ids then persist via helper
-    const updated = likedIds.includes(likedTrack.id)
-      ? likedIds.filter(id => id !== likedTrack.id)
-      : [...likedIds, likedTrack.id];
-
-    // update local state / storage through the hook
-    toggleLike(likedTrack.id);
-
-    // make sure the helper is used for persistence as requested
-    await saveLikedSongs(updated);
+    // updating via hook will also persist and emit events
+    await toggleLike(likedTrack.id);
   };
 
   if (loading) {
