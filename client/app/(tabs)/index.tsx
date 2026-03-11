@@ -4,6 +4,7 @@ import Swiper from "react-native-deck-swiper";
 import { Audio } from "expo-av";
 import { Ionicons } from '@expo/vector-icons';
 import { BASE_URL } from "../../constants/api";
+import { saveLikedSongs, getLikedSongs } from '../../services/storage';
 
 const { width, height } = Dimensions.get("window");
 
@@ -21,6 +22,38 @@ const BG = "#0B0B0F";
 const PURPLE = "#7B61FF";
 
 const PlaybackContext = createContext({ playingId: null as string | null });
+
+const LIKED_SONGS_KEY = '@liked_songs_ids';
+
+export const useLikedSongs = () => {
+  const [likedIds, setLikedIds] = useState<string[]>([]);
+
+  // NOTE: initialization happens in the next effect, no need to clear on startup
+
+  // Load liked songs on startup
+  useEffect(() => {
+    const loadSongs = async () => {
+      const stored = await getLikedSongs();
+      setLikedIds(stored);
+    };
+    loadSongs();
+  }, []);
+
+  const toggleLike = async (trackId: string) => {
+    let updatedIds;
+    if (likedIds.includes(trackId)) {
+      updatedIds = likedIds.filter(id => id !== trackId); // Remove if already liked
+    } else {
+      updatedIds = [...likedIds, trackId]; // Add new like
+    }
+
+    setLikedIds(updatedIds);
+    // persist via shared helper so listeners fire
+    await saveLikedSongs(updatedIds);
+  };
+
+  return { likedIds, toggleLike };
+};
 
 const TrackCard = ({ card }: { card: Track | null }) => {
   const { playingId } = useContext(PlaybackContext);
@@ -66,6 +99,8 @@ export default function DiscoveryScreen() {
 
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [sound, setSound] = useState<Audio.Sound | null>(null);
+
+  const { likedIds, toggleLike } = useLikedSongs();
 
   useEffect(() => {
     Audio.setAudioModeAsync({
@@ -175,6 +210,13 @@ export default function DiscoveryScreen() {
     }
   };
 
+  const handleOnSwipedRight = async (cardIndex: number) => {
+    const likedTrack = cards[cardIndex];
+
+    // updating via hook will also persist and emit events
+    await toggleLike(likedTrack.id);
+  };
+
   if (loading) {
     return (
       <View style={styles.centered}>
@@ -195,6 +237,7 @@ export default function DiscoveryScreen() {
           verticalSwipe={false}
           animateCardOpacity
           onSwiped={handleOnSwiped}
+          onSwipedRight={handleOnSwipedRight}
           onTapCard={togglePlayback}
           marginTop={0.00625 * height}
           marginBottom={0}
