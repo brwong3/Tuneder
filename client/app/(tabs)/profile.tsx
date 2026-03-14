@@ -1,5 +1,6 @@
 import React, { useMemo } from "react";
-import { View, Text, StyleSheet, FlatList, Pressable } from "react-native";
+import { View, Text, StyleSheet, FlatList, Pressable, Alert, Platform } from "react-native";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 
 const BG = "#0B0B0F";
@@ -15,12 +16,52 @@ type Tab = {
 
 export default function ProfileScreen() {
   const tabs = useMemo<Tab[]>(() => [
-    { id: "1", name: "Account", link: "/account" },
-    { id: "2", name: "Preferences", link: "/preferences" },
-    { id: "3", name: "Logout", link: "/logout" },
+    { id: "1", name: "Preferences", link: "/preferences" },
+    { id: "2", name: "Clear Data", link: "/clear_data" },
   ], []);
 
+  const clearUserData = async () => {
+    try {
+      await AsyncStorage.clear();
+    } catch (error) {
+      console.error("Failed to clear local data", error);
+
+      if (Platform.OS === "web") {
+        window.alert("Could not clear local data. Please try again.");
+      } else {
+        Alert.alert("Error", "Could not clear local data. Please try again.");
+      }
+    }
+  };
+
+  const confirmClearUserData = () => {
+    console.log("User initiated data clear");
+    if (Platform.OS === "web") {
+      const confirmed = window.confirm(
+        "This will remove all locally stored data (likes, preferences, etc.). This cannot be undone.\n\nProceed?"
+      );
+      if (confirmed) {
+        clearUserData();
+      }
+      return;
+    }
+
+    Alert.alert(
+      "Clear data",
+      "This will remove all locally stored data (likes, preferences, etc.). This cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Yes, clear", style: "destructive", onPress: clearUserData },
+      ]
+    );
+  };
+
   const handlePress = (link: string) => {
+    if (link === "/clear_data") {
+      confirmClearUserData();
+      return;
+    }
+
     console.log("Navigating to:", link);
   };
 
