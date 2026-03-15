@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect, createContext, useContext } from "react";
 import { View, Text, ImageBackground, StyleSheet, ActivityIndicator, Dimensions } from "react-native";
+import { useIsFocused } from '@react-navigation/native';
 import Swiper from "react-native-deck-swiper";
 import { Audio } from "expo-av";
 import { Ionicons } from '@expo/vector-icons';
@@ -7,6 +8,7 @@ import { BASE_URL } from "../../constants/api";
 import TextTicker from 'react-native-text-ticker';
 import { useTheme } from '../../context/ThemeContext'; 
 import { useDiscovery } from "../../context/DiscoveryContext";
+import { saveLikedSongs, getLikedSongs } from '../../services/storage';
 
 const { width, height } = Dimensions.get("window");
 
@@ -22,6 +24,36 @@ type Track = {
 
 const PlaybackContext = createContext({ playingId: null as string | null });
 
+const LIKED_SONGS_KEY = '@liked_songs_ids';
+
+export const useLikedSongs = () => {
+  const [likedIds, setLikedIds] = useState<string[]>([]);
+
+  // Load liked songs on startup
+  useEffect(() => {
+    const loadSongs = async () => {
+      const stored = await getLikedSongs();
+      setLikedIds(stored);
+    };
+    loadSongs();
+  }, []);
+
+  const toggleLike = async (trackId: string) => {
+    let updatedIds;
+    if (likedIds.includes(trackId)) {
+      updatedIds = likedIds.filter(id => id !== trackId); // Remove if already liked
+    } else {
+      updatedIds = [...likedIds, trackId]; // Add new like
+    }
+
+    setLikedIds(updatedIds);
+    // persist via shared helper so listeners fire
+    await saveLikedSongs(updatedIds);
+  };
+
+  return { likedIds, toggleLike };
+};
+
 const TrackCard = ({ card }: { card: Track | null }) => {
   const { playingId } = useContext(PlaybackContext);
   const { colors } = useTheme(); 
@@ -31,10 +63,14 @@ const TrackCard = ({ card }: { card: Track | null }) => {
   const isPlaying = playingId === card.id;
 
   return (
-    <ImageBackground source={{ uri: card.image }} style={styles.card} imageStyle={styles.cardImage}>
+    <ImageBackground
+      source={{ uri: card.image }}
+      style={[styles.card, { userSelect: "none" } as any]}
+      imageStyle={styles.cardImage}
+    >
       <View style={styles.overlay}>
         <View style={styles.genreTag}>
-          <Text style={styles.genreText}>{card.genre.toUpperCase()}</Text>
+          <Text selectable={false} style={styles.genreText}>{card.genre.toUpperCase()}</Text>
         </View>
         
         <View style={[styles.bottomSection, { backgroundColor: isPlaying ? 'rgba(0,0,0,0.8)' : 'rgba(0,0,0,0.6)' }]}>
@@ -90,6 +126,8 @@ export default function DiscoveryScreen() {
 
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [sound, setSound] = useState<Audio.Sound | null>(null);
+
+  const { likedIds, toggleLike } = useLikedSongs();
 
   useEffect(() => {
     Audio.setAudioModeAsync({
@@ -174,6 +212,29 @@ export default function DiscoveryScreen() {
     };
   }, [currentIndex, cards]);
 
+  const isFocused = useIsFocused();
+  const [shouldResumeOnFocus, setShouldResumeOnFocus] = useState(false);
+
+  useEffect(() => {
+    if (!sound) return;
+
+    if (!isFocused) {
+      sound.getStatusAsync().then((status) => {
+        if (status.isLoaded && status.isPlaying) {
+          setShouldResumeOnFocus(true);
+          sound.pauseAsync().catch(() => {});
+        }
+      });
+    } else if (shouldResumeOnFocus) {
+      sound.getStatusAsync().then((status) => {
+        if (status.isLoaded && !status.isPlaying) {
+          sound.playAsync().catch(() => {});
+        }
+      });
+      setShouldResumeOnFocus(false);
+    }
+  }, [isFocused, sound, shouldResumeOnFocus]);
+
   const togglePlayback = async () => {
     if (!sound) return;
     const status = await sound.getStatusAsync();
@@ -187,6 +248,13 @@ export default function DiscoveryScreen() {
     if (cardsLeft <= 3 && !isFetchingMore) {
       fetchMusicBatch(true);
     }
+  };
+
+  const handleOnSwipedRight = async (cardIndex: number) => {
+    const likedTrack = cards[cardIndex];
+
+    // updating via hook will also persist and emit events
+    await toggleLike(likedTrack.id);
   };
 
   if (loading) {
@@ -209,6 +277,7 @@ export default function DiscoveryScreen() {
           verticalSwipe={false}
           animateCardOpacity
           onSwiped={handleOnSwiped}
+          onSwipedRight={handleOnSwipedRight}
           onTapCard={togglePlayback}
           marginTop={0.00625 * height}
           marginBottom={0}

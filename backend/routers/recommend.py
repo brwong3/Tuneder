@@ -360,6 +360,25 @@ async def get_context(query: ContextQuery, request: Request):
     return {"recommendations": valid_songs}
 
 
+@router.post("/features_by_ids")
+async def get_features(track_ids: List[str], request: Request):
+    ids_obj = request.app.state.ids
+    index = request.app.state.index
+    
+    # Map the string IDs to their integer indices in the FAISS index
+    id_to_idx = {str(sid): i for i, sid in enumerate(ids_obj)}
+    
+    selected_features = []
+    all_vectors = faiss.rev_swig_ptr(index.get_xb(), index.ntotal * index.d).reshape(index.ntotal, index.d) #
+
+    for tid in track_ids:
+        if tid in id_to_idx:
+            idx = id_to_idx[tid]
+            selected_features.append(all_vectors[idx].tolist())
+            
+    return {"features": selected_features}
+
+
 @router.get("/snapshot/{track_id}", response_model=TrackSnapshot)
 async def get_track_snapshot(track_id: str, request: Request):
     """
