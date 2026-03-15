@@ -4,22 +4,20 @@ import { Platform } from "react-native";
 
 import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-
-const BRAND_PURPLE = "#7B61FF";
-const BG = "#0B0B0F";
-const BG_ELEV = "#14141A";
-const TEXT_MUTED = "#9AA0A6";
+import { useTheme } from '@/context/ThemeContext'; 
 
 export default function TabLayout() {
+  const { colors, isDarkMode } = useTheme();
+
   return (
     <Tabs
       screenOptions={{
         headerShown: true,
         headerTitle: "Tuneder",
         headerTitleAlign: "center",
-        headerStyle: { backgroundColor: BG_ELEV },
+        headerStyle: { backgroundColor: colors.tabBg },
         headerTitleStyle: {
-          color: BRAND_PURPLE,
+          color: colors.primary,
           fontSize: 28,
           fontWeight: "700",
           letterSpacing: 0.5,
@@ -27,15 +25,15 @@ export default function TabLayout() {
         headerShadowVisible: false,
 
         tabBarStyle: {
-          backgroundColor: BG_ELEV,
-          borderTopColor: "rgba(255,255,255,0.08)",
+          backgroundColor: colors.tabBg,
+          borderTopColor: colors.border,
           borderTopWidth: 1,
           height: Platform.OS === "ios" ? 88 : 74,
           paddingTop: 8,
           paddingBottom: Platform.OS === "ios" ? 24 : 10,
         },
-        tabBarActiveTintColor: BRAND_PURPLE,
-        tabBarInactiveTintColor: TEXT_MUTED,
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.subText,
         tabBarLabelStyle: {
           fontSize: 11,
           fontWeight: "600",
@@ -43,7 +41,7 @@ export default function TabLayout() {
         },
 
         tabBarButton: HapticTab,
-        sceneStyle: { backgroundColor: BG },
+        sceneStyle: { backgroundColor: colors.bg },
       }}
     >
       <Tabs.Screen

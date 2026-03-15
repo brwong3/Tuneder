@@ -10,12 +10,13 @@ IDS_FILENAME = "track_ids.npy"
 GENRES_FILENAME = "track_genres.npy" 
 SCALER_FILENAME = "scaler.pkl"
 
-FEATURE_MAPPING = {
-    "danceability": 0, "energy": 1, "key": 2, "loudness": 3, 
-    "mode": 4, "speechiness": 5, "acousticness": 6, 
-    "instrumentalness": 7, "liveness": 8, "valence": 9, 
-    "tempo": 10, "time_signature": 11
-}
+FEATURE_COLUMNS = [
+    "popularity", "danceability", "energy", "key", "loudness", 
+    "mode", "speechiness", "acousticness", "instrumentalness", 
+    "liveness", "valence", "tempo", "time_signature"
+]
+
+FEATURE_MAPPING = {feat: idx for idx, feat in enumerate(FEATURE_COLUMNS)}
 
 def build_tuneder_index():
     csv = pd.read_csv(CSV_PATH, header=0).iloc[:, 1:]
@@ -23,10 +24,10 @@ def build_tuneder_index():
     csv.reset_index(drop=True, inplace=True)
 
     np.save(IDS_FILENAME, csv["track_id"].values)
-
     np.save(GENRES_FILENAME, csv["track_genre"].values)
 
-    raw_features = csv.iloc[:, 7:19].values.astype('float32')
+    raw_features = csv[FEATURE_COLUMNS].values.astype('float32')
+    
     scaler = MinMaxScaler()
     normalized_features = scaler.fit_transform(raw_features)
     
