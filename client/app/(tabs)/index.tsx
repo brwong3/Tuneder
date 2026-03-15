@@ -4,6 +4,9 @@ import Swiper from "react-native-deck-swiper";
 import { Audio } from "expo-av";
 import { Ionicons } from '@expo/vector-icons';
 import { BASE_URL } from "../../constants/api";
+import TextTicker from 'react-native-text-ticker';
+import { useTheme } from '../../context/ThemeContext'; 
+import { useDiscovery } from "../../context/DiscoveryContext";
 
 const { width, height } = Dimensions.get("window");
 
@@ -17,15 +20,13 @@ type Track = {
   preview_url: string; 
 };
 
-const BG = "#0B0B0F";
-const PURPLE = "#7B61FF";
-
 const PlaybackContext = createContext({ playingId: null as string | null });
 
 const TrackCard = ({ card }: { card: Track | null }) => {
   const { playingId } = useContext(PlaybackContext);
+  const { colors } = useTheme(); 
   
-  if (!card) return <View style={styles.emptyCard} />;
+  if (!card) return <View style={[styles.emptyCard, { backgroundColor: colors.tabBg }]} />;
 
   const isPlaying = playingId === card.id;
 
@@ -36,13 +37,34 @@ const TrackCard = ({ card }: { card: Track | null }) => {
           <Text style={styles.genreText}>{card.genre.toUpperCase()}</Text>
         </View>
         
-        <View style={styles.bottomSection}>
+        <View style={[styles.bottomSection, { backgroundColor: isPlaying ? 'rgba(0,0,0,0.8)' : 'rgba(0,0,0,0.6)' }]}>
           <View style={styles.metaContainer}>
-            <Text style={styles.title} numberOfLines={1}>{card.title}</Text>
-            <Text style={styles.subtitle} numberOfLines={1}>{card.artist}</Text>
+            <TextTicker
+              style={[styles.title, { color: '#FFFFFF' }]}
+              duration={5000}
+              loop
+              bounce={false} 
+              repeatSpacer={50}
+              marqueeDelay={1500}
+              animationType="auto"
+            >
+              {card.title}
+            </TextTicker>
+            
+            <TextTicker
+              style={[styles.subtitle, { color: 'rgba(255,255,255,0.7)' }]}
+              duration={5000}
+              loop
+              bounce={false}
+              repeatSpacer={50}
+              marqueeDelay={1500}
+              animationType="auto"
+            >
+              {card.artist}
+            </TextTicker>
           </View>
 
-          <View style={styles.playPauseButton}>
+          <View style={[styles.playPauseButton, { borderColor: 'rgba(255,255,255,0.3)' }]}>
             <Ionicons 
               name={isPlaying ? "pause" : "play"} 
               size={24} 
@@ -58,11 +80,13 @@ const TrackCard = ({ card }: { card: Track | null }) => {
 
 
 export default function DiscoveryScreen() {
+  const { colors } = useTheme(); 
   const swiperRef = useRef<Swiper<Track>>(null);
   const [cards, setCards] = useState<Track[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
+  const { getDiscoveryPayload } = useDiscovery();
 
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [sound, setSound] = useState<Audio.Sound | null>(null);
@@ -78,13 +102,15 @@ export default function DiscoveryScreen() {
 
   const fetchMusicBatch = async (isPrefetch = false) => {
     if (isPrefetch) setIsFetchingMore(true);
+    const discoveryData = getDiscoveryPayload();
     try {
       const response = await fetch(`${BASE_URL}/random`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           k: 10,
-          weights: { "danceability": 1.0, "energy": 1.0 }
+          weights: { "danceability": 1.0, "energy": 1.0 },
+          filters: discoveryData.filters
         }),
       });
 
@@ -127,16 +153,10 @@ export default function DiscoveryScreen() {
               setPlayingId(status.isPlaying ? currentCard.id : null);
             }
           });
-
-          const initialStatus = await newSound.getStatusAsync();
-          if (initialStatus.isLoaded) {
-             setPlayingId(initialStatus.isPlaying ? currentCard.id : null);
-          }
         } else {
           await newSound.unloadAsync();
         }
       } catch (error) {
-        console.warn("Autoplay blocked by browser or playback error:", error);
         if (isMounted) setPlayingId(null); 
       }
     };
@@ -156,15 +176,9 @@ export default function DiscoveryScreen() {
 
   const togglePlayback = async () => {
     if (!sound) return;
-    
     const status = await sound.getStatusAsync();
     if (!status.isLoaded) return;
-
-    if (status.isPlaying) {
-      await sound.pauseAsync();
-    } else {
-      await sound.playAsync();
-    }
+    status.isPlaying ? await sound.pauseAsync() : await sound.playAsync();
   };
 
   const handleOnSwiped = (cardIndex: number) => {
@@ -177,15 +191,15 @@ export default function DiscoveryScreen() {
 
   if (loading) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color={PURPLE} />
+      <View style={[styles.centered, { backgroundColor: colors.bg }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
 
   return (
     <PlaybackContext.Provider value={{ playingId }}>
-      <View style={styles.screen}>
+      <View style={[styles.screen, { backgroundColor: colors.bg }]}>
         <Swiper
           ref={swiperRef}
           cards={cards}
@@ -200,9 +214,7 @@ export default function DiscoveryScreen() {
           marginBottom={0}
           cardVerticalMargin={0}
           cardHorizontalMargin={0}
-          renderCard={(card) => {
-            return <TrackCard card={card} />;
-          }}
+          renderCard={(card) => <TrackCard card={card} />}
         />
       </View>
     </PlaybackContext.Provider>
@@ -210,8 +222,8 @@ export default function DiscoveryScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: BG },
-  centered: { flex: 1, backgroundColor: BG, justifyContent: "center", alignItems: "center" },
+  screen: { flex: 1 },
+  centered: { flex: 1, justifyContent: "center", alignItems: "center" },
   card: {
     width: width * 0.94,
     height: height * 0.75,
@@ -221,7 +233,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   cardImage: { borderRadius: 24 },
-  emptyCard: { width: width * 0.94, height: height * 0.75, backgroundColor: "#15151A", borderRadius: 24 },
+  emptyCard: { width: width * 0.94, height: height * 0.75, borderRadius: 24 },
   overlay: {
     flex: 1,
     padding: 24,
@@ -242,15 +254,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: "rgba(0,0,0,0.6)",
     padding: 20,
     borderRadius: 24,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.1)", 
   },
   metaContainer: { flex: 1, marginRight: 15 },
-  title: { color: "white", fontSize: 24, fontWeight: "900" },
-  subtitle: { color: "rgba(255,255,255,0.7)", fontSize: 15, fontWeight: "600", marginTop: 4 },
+  title: { fontSize: 24, fontWeight: "900" },
+  subtitle: { fontSize: 15, fontWeight: "600", marginTop: 4 },
   playPauseButton: {
     width: 50,
     height: 50,
@@ -259,6 +270,5 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.3)",
   }
 });
