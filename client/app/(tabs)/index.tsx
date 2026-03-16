@@ -1,16 +1,17 @@
-import React, { useRef, useState, useEffect, createContext, useContext } from "react";
-import { View, Text, ImageBackground, StyleSheet, ActivityIndicator, Dimensions } from "react-native";
+import React, { useRef, useState, useEffect, createContext, useContext, useCallback } from 'react';
+import { View, Text, ImageBackground, StyleSheet, ActivityIndicator, Dimensions, StyleProp, ViewStyle } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
-import Swiper from "react-native-deck-swiper";
-import { Audio } from "expo-av";
+import Swiper from 'react-native-deck-swiper';
+import { Audio } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
-import { BASE_URL } from "../../constants/api";
 import TextTicker from 'react-native-text-ticker';
-import { useTheme } from '../../context/ThemeContext'; 
-import { useDiscovery } from "../../context/DiscoveryContext";
-import { saveLikedSongs, getLikedSongs } from '../../services/storage';
 
-const { width, height } = Dimensions.get("window");
+import { useTheme } from '../../context/ThemeContext';
+import { useDiscovery } from '../../context/DiscoveryContext';
+import { saveLikedSongs, getLikedSongs } from '../../services/storage';
+import { BASE_URL } from '../../constants/api';
+
+const { width, height } = Dimensions.get('window');
 
 type Track = {
   id: string;
@@ -19,36 +20,31 @@ type Track = {
   album: string;
   image: string;
   genre: string;
-  preview_url: string; 
+  preview_url: string;
 };
 
 const PlaybackContext = createContext({ playingId: null as string | null });
 
-const LIKED_SONGS_KEY = '@liked_songs_ids';
-
 export const useLikedSongs = () => {
   const [likedIds, setLikedIds] = useState<string[]>([]);
 
-  // Load liked songs on startup
   useEffect(() => {
     const loadSongs = async () => {
       const stored = await getLikedSongs();
-      setLikedIds(stored);
+      if (stored) setLikedIds(stored);
     };
     loadSongs();
   }, []);
 
   const toggleLike = async (trackId: string) => {
-    let updatedIds;
-    if (likedIds.includes(trackId)) {
-      updatedIds = likedIds.filter(id => id !== trackId); // Remove if already liked
-    } else {
-      updatedIds = [...likedIds, trackId]; // Add new like
-    }
-
-    setLikedIds(updatedIds);
-    // persist via shared helper so listeners fire
-    await saveLikedSongs(updatedIds);
+    setLikedIds((prev) => {
+      const updatedIds = prev.includes(trackId)
+        ? prev.filter((id) => id !== trackId)
+        : [...prev, trackId];
+      
+      saveLikedSongs(updatedIds).catch((err) => console.error("Failed to save liked songs:", err));
+      return updatedIds;
+    });
   };
 
   return { likedIds, toggleLike };
@@ -56,37 +52,41 @@ export const useLikedSongs = () => {
 
 const TrackCard = ({ card }: { card: Track | null }) => {
   const { playingId } = useContext(PlaybackContext);
-  const { colors } = useTheme(); 
-  
-  if (!card) return <View style={[styles.emptyCard, { backgroundColor: colors.tabBg }]} />;
+  const { colors } = useTheme();
+
+  if (!card) {
+    return <View style={[styles.emptyCard, { backgroundColor: colors.tabBg }]} />;
+  }
 
   const isPlaying = playingId === card.id;
 
   return (
     <ImageBackground
       source={{ uri: card.image }}
-      style={[styles.card, { userSelect: "none" } as any]}
+      style={[styles.card, { userSelect: 'none' } as StyleProp<ViewStyle>]}
       imageStyle={styles.cardImage}
     >
       <View style={styles.overlay}>
         <View style={styles.genreTag}>
-          <Text selectable={false} style={styles.genreText}>{card.genre.toUpperCase()}</Text>
+          <Text selectable={false} style={styles.genreText}>
+            {card.genre.toUpperCase()}
+          </Text>
         </View>
-        
+
         <View style={[styles.bottomSection, { backgroundColor: isPlaying ? 'rgba(0,0,0,0.8)' : 'rgba(0,0,0,0.6)' }]}>
           <View style={styles.metaContainer}>
             <TextTicker
               style={[styles.title, { color: '#FFFFFF' }]}
               duration={5000}
               loop
-              bounce={false} 
+              bounce={false}
               repeatSpacer={50}
               marqueeDelay={1500}
               animationType="auto"
             >
               {card.title}
             </TextTicker>
-            
+
             <TextTicker
               style={[styles.subtitle, { color: 'rgba(255,255,255,0.7)' }]}
               duration={5000}
@@ -101,11 +101,11 @@ const TrackCard = ({ card }: { card: Track | null }) => {
           </View>
 
           <View style={[styles.playPauseButton, { borderColor: 'rgba(255,255,255,0.3)' }]}>
-            <Ionicons 
-              name={isPlaying ? "pause" : "play"} 
-              size={24} 
-              color="white" 
-              style={{ marginLeft: isPlaying ? 0 : 3 }} 
+            <Ionicons
+              name={isPlaying ? 'pause' : 'play'}
+              size={24}
+              color="white"
+              style={{ marginLeft: isPlaying ? 0 : 3 }}
             />
           </View>
         </View>
@@ -114,20 +114,57 @@ const TrackCard = ({ card }: { card: Track | null }) => {
   );
 };
 
-
 export default function DiscoveryScreen() {
-  const { colors } = useTheme(); 
+  const { colors } = useTheme();
+  const { getDiscoveryPayload } = useDiscovery();
+  const { toggleLike } = useLikedSongs();
+  const isFocused = useIsFocused();
   const swiperRef = useRef<Swiper<Track>>(null);
+
   const [cards, setCards] = useState<Track[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
-  const { getDiscoveryPayload } = useDiscovery();
-
+  
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [sound, setSound] = useState<Audio.Sound | null>(null);
+  const [shouldResumeOnFocus, setShouldResumeOnFocus] = useState(false);
 
-  const { likedIds, toggleLike } = useLikedSongs();
+  const fetchMusicBatch = useCallback(async (isPrefetch = false) => {
+    if (isPrefetch) setIsFetchingMore(true);
+    
+    try {
+      const discoveryData = getDiscoveryPayload();
+      const response = await fetch(`${BASE_URL}/random`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true' 
+        },
+        body: JSON.stringify({
+          k: 5,
+          weights: { danceability: 1.0, energy: 1.0 },
+          filters: discoveryData.filters,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`🚨 Backend Error (${response.status}):`, errorText);
+        return; 
+      }
+
+      const data = await response.json();
+      if (data.recommendations) {
+        setCards((prev) => isPrefetch ? [...prev, ...data.recommendations] : data.recommendations);
+      }
+    } catch (error) {
+      console.error('🚨 Network/Fetch Error:', error);
+    } finally {
+      setLoading(false);
+      setIsFetchingMore(false);
+    }
+  }, [getDiscoveryPayload]);
 
   useEffect(() => {
     Audio.setAudioModeAsync({
@@ -136,41 +173,11 @@ export default function DiscoveryScreen() {
       shouldDuckAndroid: true,
     });
     fetchMusicBatch();
-  }, []);
-
-  const fetchMusicBatch = async (isPrefetch = false) => {
-    if (isPrefetch) setIsFetchingMore(true);
-    const discoveryData = getDiscoveryPayload();
-    try {
-      const response = await fetch(`${BASE_URL}/random`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          k: 10,
-          weights: { "danceability": 1.0, "energy": 1.0 },
-          filters: discoveryData.filters
-        }),
-      });
-
-      const data = await response.json();
-      if (data.recommendations) {
-        if (isPrefetch) {
-          setCards(prev => [...prev, ...data.recommendations]);
-        } else {
-          setCards(data.recommendations);
-        }
-      }
-    } catch (error) {
-      console.error("Discovery API Error:", error);
-    } finally {
-      setLoading(false);
-      setIsFetchingMore(false);
-    }
-  };
+  }, [fetchMusicBatch]);
 
   useEffect(() => {
     const currentCard = cards[currentIndex];
-    if (!currentCard || !currentCard.preview_url) return;
+    if (!currentCard?.preview_url) return;
 
     let isMounted = true;
     let localSound: Audio.Sound | null = null;
@@ -178,24 +185,26 @@ export default function DiscoveryScreen() {
     const loadAndPlay = async () => {
       try {
         const { sound: newSound } = await Audio.Sound.createAsync(
-          { uri: currentCard.preview_url },
+          { uri: currentCard.preview_url }, 
           { shouldPlay: true, isLooping: true }
         );
 
-        if (isMounted) {
-          setSound(newSound);
-          localSound = newSound;
-          
-          newSound.setOnPlaybackStatusUpdate((status) => {
-            if (status.isLoaded) {
-              setPlayingId(status.isPlaying ? currentCard.id : null);
-            }
-          });
-        } else {
+        if (!isMounted) {
           await newSound.unloadAsync();
+          return;
         }
+
+        setSound(newSound);
+        localSound = newSound;
+
+        newSound.setOnPlaybackStatusUpdate((status) => {
+          if (status.isLoaded) {
+            setPlayingId(status.isPlaying ? currentCard.id : null);
+          }
+        });
       } catch (error) {
-        if (isMounted) setPlayingId(null); 
+        console.error('🚨 Audio load error:', error);
+        if (isMounted) setPlayingId(null);
       }
     };
 
@@ -203,58 +212,53 @@ export default function DiscoveryScreen() {
 
     return () => {
       isMounted = false;
+      setPlayingId(null);
       if (localSound) {
         localSound.setOnPlaybackStatusUpdate(null);
-        localSound.stopAsync();
-        localSound.unloadAsync();
+        localSound.stopAsync().finally(() => localSound?.unloadAsync());
       }
-      setPlayingId(null); 
     };
   }, [currentIndex, cards]);
-
-  const isFocused = useIsFocused();
-  const [shouldResumeOnFocus, setShouldResumeOnFocus] = useState(false);
 
   useEffect(() => {
     if (!sound) return;
 
-    if (!isFocused) {
-      sound.getStatusAsync().then((status) => {
-        if (status.isLoaded && status.isPlaying) {
-          setShouldResumeOnFocus(true);
-          sound.pauseAsync().catch(() => {});
-        }
-      });
-    } else if (shouldResumeOnFocus) {
-      sound.getStatusAsync().then((status) => {
-        if (status.isLoaded && !status.isPlaying) {
-          sound.playAsync().catch(() => {});
-        }
-      });
-      setShouldResumeOnFocus(false);
-    }
+    const handleFocusAudio = async () => {
+      const status = await sound.getStatusAsync();
+      if (!status.isLoaded) return;
+
+      if (!isFocused && status.isPlaying) {
+        setShouldResumeOnFocus(true);
+        await sound.pauseAsync();
+      } else if (isFocused && shouldResumeOnFocus && !status.isPlaying) {
+        await sound.playAsync();
+        setShouldResumeOnFocus(false);
+      }
+    };
+
+    handleFocusAudio();
   }, [isFocused, sound, shouldResumeOnFocus]);
 
   const togglePlayback = async () => {
     if (!sound) return;
     const status = await sound.getStatusAsync();
-    if (!status.isLoaded) return;
-    status.isPlaying ? await sound.pauseAsync() : await sound.playAsync();
+    if (status.isLoaded) {
+      status.isPlaying ? await sound.pauseAsync() : await sound.playAsync();
+    }
   };
 
   const handleOnSwiped = (cardIndex: number) => {
-    setCurrentIndex(cardIndex + 1);
-    const cardsLeft = cards.length - (cardIndex + 1);
-    if (cardsLeft <= 3 && !isFetchingMore) {
+    const newIndex = cardIndex + 1;
+    setCurrentIndex(newIndex);
+    
+    if (cards.length - newIndex <= 3 && !isFetchingMore) {
       fetchMusicBatch(true);
     }
   };
 
-  const handleOnSwipedRight = async (cardIndex: number) => {
+  const handleOnSwipedRight = (cardIndex: number) => {
     const likedTrack = cards[cardIndex];
-
-    // updating via hook will also persist and emit events
-    await toggleLike(likedTrack.id);
+    if (likedTrack) toggleLike(likedTrack.id);
   };
 
   if (loading) {
@@ -292,12 +296,12 @@ export default function DiscoveryScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  centered: { flex: 1, justifyContent: "center", alignItems: "center" },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   card: {
     width: width * 0.94,
     height: height * 0.75,
     borderRadius: 24,
-    overflow: "hidden",
+    overflow: 'hidden',
     alignSelf: 'center',
     marginTop: 10,
   },
@@ -306,19 +310,19 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     padding: 24,
-    justifyContent: "space-between",
-    backgroundColor: "rgba(0,0,0,0.2)",
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(0,0,0,0.2)',
   },
   genreTag: {
-    backgroundColor: "rgba(255, 255, 255, 0.25)",
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
     alignSelf: 'flex-start',
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.3)",
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
-  genreText: { color: "white", fontSize: 10, fontWeight: "800", letterSpacing: 1.2 },
+  genreText: { color: 'white', fontSize: 10, fontWeight: '800', letterSpacing: 1.2 },
   bottomSection: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -326,18 +330,18 @@ const styles = StyleSheet.create({
     padding: 20,
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)", 
+    borderColor: 'rgba(255,255,255,0.1)',
   },
   metaContainer: { flex: 1, marginRight: 15 },
-  title: { fontSize: 24, fontWeight: "900" },
-  subtitle: { fontSize: 15, fontWeight: "600", marginTop: 4 },
+  title: { fontSize: 24, fontWeight: '900' },
+  subtitle: { fontSize: 15, fontWeight: '600', marginTop: 4 },
   playPauseButton: {
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: "rgba(255, 255, 255, 0.15)",
-    justifyContent: "center",
-    alignItems: "center",
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
     borderWidth: 1,
-  }
+  },
 });
