@@ -24,8 +24,8 @@ SPOTIFY_API_BASE = "https://api.spotify.com/v1"
 class DiscoveryFilters(BaseModel):
     min_energy: float
     max_energy: float
-    min_popularity: int
-    max_popularity: int
+    min_popularity: float
+    max_popularity: float
     min_valence: float
     max_valence: float
     instrumentalness: Optional[float] = None
@@ -210,7 +210,7 @@ def apply_discovery_priorities(
 ) -> Tuple[List[float], Dict[str, float]]:
     """
     Clamps the target vector to ensure FAISS starts its search inside the 
-    user's requested discovery boundaries, and boosts their KNN weights.
+    user's requested discovery boundaries, and massively boosts their KNN weights.
     """
     if not filters:
         return raw_target, weights
@@ -218,24 +218,31 @@ def apply_discovery_priorities(
     clamped = list(raw_target)
     new_weights = dict(weights)
     
+    FORCE_WEIGHT = 100.0 
+    
     clamped[0] = max(filters.min_popularity, min(clamped[0], filters.max_popularity))
-    new_weights["0"] = new_weights.get("0", 1.0) * 5.0 
+    new_weights["0"] = new_weights.get("0", 1.0) * FORCE_WEIGHT 
     
     clamped[2] = max(filters.min_energy, min(clamped[2], filters.max_energy))
-    new_weights["2"] = new_weights.get("2", 1.0) * 5.0
+    new_weights["2"] = new_weights.get("2", 1.0) * FORCE_WEIGHT
     
     clamped[10] = max(filters.min_valence, min(clamped[10], filters.max_valence))
-    new_weights["10"] = new_weights.get("10", 1.0) * 5.0
+    new_weights["10"] = new_weights.get("10", 1.0) * FORCE_WEIGHT
     
     if filters.instrumentalness is not None:
         clamped[8] = max(filters.instrumentalness, clamped[8])
-        new_weights["8"] = new_weights.get("8", 1.0) * 5.0
+        new_weights["8"] = new_weights.get("8", 1.0) * FORCE_WEIGHT
         
     return clamped, new_weights
 
 
 @router.post("/random", response_model=RecommendationResponse)
 async def get_random(query: RandomQuery, request: Request):    
+
+    if query.filters:
+        query.filters.min_popularity /= 100.0
+        query.filters.max_popularity /= 100.0
+
     index, ids, scaler = request.app.state.index, request.app.state.ids, request.app.state.scaler
     genres = request.app.state.genres 
     
@@ -253,7 +260,7 @@ async def get_random(query: RandomQuery, request: Request):
         weights=query.weights
     )
     
-    fetch_k = query.k * 50 
+    fetch_k = min(10000, index.ntotal) if index.ntotal > 0 else 0
     
     neighbor_ids = search_weighted_knn(
         target_vector=prioritized_vector,
@@ -336,6 +343,11 @@ async def get_random(query: RandomQuery, request: Request):
 
 @router.post("/context", response_model=RecommendationResponse)
 async def get_context(query: ContextQuery, request: Request):
+
+    if query.filters:
+        query.filters.min_popularity /= 100.0
+        query.filters.max_popularity /= 100.0
+
     index = request.app.state.index
     ids = request.app.state.ids
     scaler = request.app.state.scaler
@@ -351,7 +363,7 @@ async def get_context(query: ContextQuery, request: Request):
         weights=query.weights
     )
 
-    fetch_k = query.k * 50
+    fetch_k = min(10000, index.ntotal) if index.ntotal > 0 else 0
 
     neighbor_ids = search_weighted_knn(
         target_vector=prioritized_vector,
