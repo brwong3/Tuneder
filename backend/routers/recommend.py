@@ -8,7 +8,7 @@ import re
 import urllib.parse
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 import faiss
 
 from index import search_weighted_knn
@@ -65,6 +65,7 @@ class TrackSnapshot(BaseModel):
     preview_url: Optional[str] = None
     embed_url: str
 
+
 def normalize_title(title: str) -> str:
     """Strips remaster and radio edit tags to prevent duplicate songs."""
     t = re.sub(r'\(.*?\)', '', title)
@@ -72,19 +73,26 @@ def normalize_title(title: str) -> str:
     t = t.split('-')[0]
     return t.lower().strip()
 
+
 async def get_spotify_token(client: httpx.AsyncClient) -> str:
     global _token_cache
     if _token_cache["access_token"] and time.time() < _token_cache["expires_at"] - 60:
         return _token_cache["access_token"]
 
-    cid = os.getenv("CLIENT_ID").strip('\"')
-    csec = os.getenv("CLIENT_SECRET").strip('\"')
+    cid = os.getenv("CLIENT_ID", "").strip('\"')
+    csec = os.getenv("CLIENT_SECRET", "").strip('\"')
+    if not cid or not csec:
+        raise HTTPException(status_code=500, detail="Missing Spotify credentials")
+
     auth_b64 = base64.b64encode(f"{cid}:{csec}".encode()).decode()
     
     res = await client.post(
         SPOTIFY_TOKEN_URL, 
         data={"grant_type": "client_credentials"}, 
-        headers={"Authorization": f"Basic {auth_b64}"}
+        headers={
+            "Authorization": f"Basic {auth_b64}",
+            "Content-Type": "application/x-www-form-urlencoded"
+        }
     )
     
     if res.status_code != 200:
@@ -93,6 +101,7 @@ async def get_spotify_token(client: httpx.AsyncClient) -> str:
     data = res.json()
     _token_cache.update({"access_token": data["access_token"], "expires_at": time.time() + data["expires_in"]})
     return data["access_token"]
+
 
 async def scrape_spotify_preview(track_id: str, client: httpx.AsyncClient) -> Optional[str]:
     """Bypasses the official API to scrape the 30s preview mp3 directly."""
@@ -116,6 +125,7 @@ async def scrape_spotify_preview(track_id: str, client: httpx.AsyncClient) -> Op
         print(f"Scraper error for {track_id}: {e}")
         return None
 
+
 async def fetch_songs_from_spotify(
     track_ids: List[str], 
     features_map: Dict[str, List[float]],
@@ -124,47 +134,62 @@ async def fetch_songs_from_spotify(
 ) -> List[Song]:
     global _song_cache
     token = await get_spotify_token(client)
-    headers = {"Authorization": f"Bearer {token}"}
+    
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+    }
     
     uncached_ids = [str(tid).strip() for tid in track_ids if str(tid).strip() not in _song_cache]
-            
-    chunk_size = 50
-    for i in range(0, len(uncached_ids), chunk_size):
-        chunk = uncached_ids[i:i + chunk_size]
-        ids_string = ",".join(chunk)
+    tracks_data = []
+
+    semaphore = asyncio.Semaphore(10) 
+    
+    async def fetch_single_track(tid, retries=2):
+        async with semaphore:
+            for attempt in range(retries):
+                res = await client.get(f"{SPOTIFY_API_BASE}/tracks/{tid}?market=US", headers=headers)
+                if res.status_code == 200:
+                    return res.json()
+                elif res.status_code == 429:
+                    retry_after = int(res.headers.get("Retry-After", 1))
+                    print(f"🚨 429 Rate Limit hit. Pausing fetching for {retry_after}s...")
+                    await asyncio.sleep(retry_after)
+                    continue
+                else:
+                    print(f"🚨 Track {tid} FAILED | Status: {res.status_code}")
+                    return None
+            return None
+
+    if uncached_ids:
+        tasks = [fetch_single_track(tid) for tid in uncached_ids]
+        results = await asyncio.gather(*tasks)
+        tracks_data.extend([t for t in results if t is not None])
+    
+    async def process_track(track):
+        tid = track["id"]
+        genre = genres_map.get(tid, "Unknown")
         
-        res = await client.get(f"{SPOTIFY_API_BASE}/tracks?ids={ids_string}&market=US", headers=headers)
-        if res.status_code != 200:
-            print(f"Batch fetch FAILED | Status: {res.status_code}")
-            continue
+        preview_url = track.get("preview_url")
+        if not preview_url:
+            preview_url = await scrape_spotify_preview(tid, client)
             
-        data = res.json()
-        tracks_data = [t for t in data.get("tracks", []) if t is not None]
+        return Song(
+            id=tid,
+            image=track["album"]["images"][0]["url"] if track["album"]["images"] else "",
+            title=track["name"],
+            genre=genre,
+            album=track["album"]["name"],
+            artist=track["artists"][0]["name"],
+            features=[],
+            preview_url=preview_url,
+            explicit=track.get("explicit", False),
+            popularity=track.get("popularity", 0)
+        )
         
-        async def process_track(track):
-            tid = track["id"]
-            genre = genres_map.get(tid, "Unknown")
-            
-            preview_url = track.get("preview_url")
-            if not preview_url:
-                preview_url = await scrape_spotify_preview(tid, client)
-                
-            return Song(
-                id=tid,
-                image=track["album"]["images"][0]["url"] if track["album"]["images"] else "",
-                title=track["name"],
-                genre=genre,
-                album=track["album"]["name"],
-                artist=track["artists"][0]["name"],
-                features=[],
-                preview_url=preview_url,
-                explicit=track.get("explicit", False),
-                popularity=track.get("popularity", 0)
-            )
-            
-        processed_songs = await asyncio.gather(*(process_track(t) for t in tracks_data))
-        for song in processed_songs:
-            _song_cache[song.id] = song
+    processed_songs = await asyncio.gather(*(process_track(t) for t in tracks_data))
+    for song in processed_songs:
+        _song_cache[song.id] = song
 
     final_songs = []
     for tid in track_ids:
@@ -178,24 +203,66 @@ async def fetch_songs_from_spotify(
     return final_songs
 
 
+def apply_discovery_priorities(
+    raw_target: List[float], 
+    filters: Optional[DiscoveryFilters], 
+    weights: Dict[str, float]
+) -> Tuple[List[float], Dict[str, float]]:
+    """
+    Clamps the target vector to ensure FAISS starts its search inside the 
+    user's requested discovery boundaries, and boosts their KNN weights.
+    """
+    if not filters:
+        return raw_target, weights
+        
+    clamped = list(raw_target)
+    new_weights = dict(weights)
+    
+    clamped[0] = max(filters.min_popularity, min(clamped[0], filters.max_popularity))
+    new_weights["0"] = new_weights.get("0", 1.0) * 5.0 
+    
+    clamped[2] = max(filters.min_energy, min(clamped[2], filters.max_energy))
+    new_weights["2"] = new_weights.get("2", 1.0) * 5.0
+    
+    clamped[10] = max(filters.min_valence, min(clamped[10], filters.max_valence))
+    new_weights["10"] = new_weights.get("10", 1.0) * 5.0
+    
+    if filters.instrumentalness is not None:
+        clamped[8] = max(filters.instrumentalness, clamped[8])
+        new_weights["8"] = new_weights.get("8", 1.0) * 5.0
+        
+    return clamped, new_weights
+
+
 @router.post("/random", response_model=RecommendationResponse)
 async def get_random(query: RandomQuery, request: Request):    
     index, ids, scaler = request.app.state.index, request.app.state.ids, request.app.state.scaler
     genres = request.app.state.genres 
     
+    if index.ntotal == 0:
+        return {"recommendations": []}
+
     ridx = np.random.randint(0, index.ntotal)
-    all_vectors = faiss.rev_swig_ptr(index.get_xb(), index.ntotal * index.d).reshape(index.ntotal, index.d)
+    scaled_target = index.reconstruct(int(ridx))
+    
+    raw_target = scaler.inverse_transform([scaled_target])[0].tolist()
+    
+    prioritized_vector, prioritized_weights = apply_discovery_priorities(
+        raw_target=raw_target,
+        filters=query.filters,
+        weights=query.weights
+    )
     
     fetch_k = query.k * 50 
     
     neighbor_ids = search_weighted_knn(
-        target_vector=all_vectors[ridx],
-        weight_dict=query.weights,
+        target_vector=prioritized_vector,
+        weight_dict=prioritized_weights,
         k=fetch_k,
         index_obj=index,
         scaler_obj=scaler,
         ids_obj=ids,
-        is_raw_input=False 
+        is_raw_input=True 
     )
     
     id_to_idx = {str(sid): i for i, sid in enumerate(ids)}
@@ -204,7 +271,7 @@ async def get_random(query: RandomQuery, request: Request):
     if not valid_neighbor_ids:
         return {"recommendations": []}
         
-    neighbor_vectors = [all_vectors[id_to_idx[nid]] for nid in valid_neighbor_ids]
+    neighbor_vectors = [index.reconstruct(id_to_idx[nid]) for nid in valid_neighbor_ids]
     raw_features_matrix = scaler.inverse_transform(neighbor_vectors)
     
     pre_filtered_ids = []
@@ -217,7 +284,6 @@ async def get_random(query: RandomQuery, request: Request):
         
         if query.filters:
             f = query.filters
-            
             popularity = raw_features[0]
             energy = raw_features[2]
             instrumentalness = raw_features[8]
@@ -233,16 +299,15 @@ async def get_random(query: RandomQuery, request: Request):
                 continue
         
         pre_filtered_ids.append(nid)
-        features_map[nid] = neighbor_vectors[i].tolist()
+        features_map[nid] = raw_features.tolist()
         genres_map[nid] = genre
         
     valid_songs = []
     seen_fingerprints = set()
-    chunk_size = query.k if query.k > 0 else 10
+    chunk_size = max(query.k + 5, 10) 
     
     for i in range(0, len(pre_filtered_ids), chunk_size):
         chunk_ids = pre_filtered_ids[i:i + chunk_size]
-        
         candidates = await fetch_songs_from_spotify(chunk_ids, features_map, genres_map, request.app.state.client)
         
         for song in candidates:
@@ -269,7 +334,7 @@ async def get_random(query: RandomQuery, request: Request):
     return {"recommendations": valid_songs}
 
 
-@router.post("/context", response_model=Dict[str, List[Song]])
+@router.post("/context", response_model=RecommendationResponse)
 async def get_context(query: ContextQuery, request: Request):
     index = request.app.state.index
     ids = request.app.state.ids
@@ -277,11 +342,20 @@ async def get_context(query: ContextQuery, request: Request):
     client = request.app.state.client
     genres = request.app.state.genres
 
+    if index.ntotal == 0:
+        return {"recommendations": []}
+
+    prioritized_vector, prioritized_weights = apply_discovery_priorities(
+        raw_target=query.feature_averages,
+        filters=query.filters,
+        weights=query.weights
+    )
+
     fetch_k = query.k * 50
 
     neighbor_ids = search_weighted_knn(
-        target_vector=query.feature_averages,
-        weight_dict=query.weights,
+        target_vector=prioritized_vector,
+        weight_dict=prioritized_weights,
         k=fetch_k,
         index_obj=index,
         scaler_obj=scaler,
@@ -289,15 +363,13 @@ async def get_context(query: ContextQuery, request: Request):
         is_raw_input=True   
     )
 
-    all_vectors = faiss.rev_swig_ptr(index.get_xb(), index.ntotal * index.d).reshape(index.ntotal, index.d)
-    
     id_to_idx = {str(sid): i for i, sid in enumerate(ids)}
     valid_neighbor_ids = [nid for nid in neighbor_ids if nid in id_to_idx]
     
     if not valid_neighbor_ids:
         return {"recommendations": []}
         
-    neighbor_vectors = [all_vectors[id_to_idx[nid]] for nid in valid_neighbor_ids]
+    neighbor_vectors = [index.reconstruct(id_to_idx[nid]) for nid in valid_neighbor_ids]
     raw_features_matrix = scaler.inverse_transform(neighbor_vectors)
     
     pre_filtered_ids = []
@@ -325,12 +397,12 @@ async def get_context(query: ContextQuery, request: Request):
                 continue
         
         pre_filtered_ids.append(nid)
-        features_map[nid] = neighbor_vectors[i].tolist()
+        features_map[nid] = raw_features.tolist()
         genres_map[nid] = genre
 
     valid_songs = []
     seen_fingerprints = set()
-    chunk_size = query.k if query.k > 0 else 10
+    chunk_size = max(query.k + 5, 10) 
     
     for i in range(0, len(pre_filtered_ids), chunk_size):
         chunk_ids = pre_filtered_ids[i:i + chunk_size]
@@ -364,32 +436,32 @@ async def get_context(query: ContextQuery, request: Request):
 async def get_features(track_ids: List[str], request: Request):
     ids_obj = request.app.state.ids
     index = request.app.state.index
+    scaler = request.app.state.scaler
     
-    # Map the string IDs to their integer indices in the FAISS index
     id_to_idx = {str(sid): i for i, sid in enumerate(ids_obj)}
-    
     selected_features = []
-    all_vectors = faiss.rev_swig_ptr(index.get_xb(), index.ntotal * index.d).reshape(index.ntotal, index.d) #
 
     for tid in track_ids:
         if tid in id_to_idx:
             idx = id_to_idx[tid]
-            selected_features.append(all_vectors[idx].tolist())
+            scaled_vec = index.reconstruct(idx)
+            raw_vec = scaler.inverse_transform([scaled_vec])[0]
+            selected_features.append(raw_vec.tolist())
             
     return {"features": selected_features}
 
 
 @router.get("/snapshot/{track_id}", response_model=TrackSnapshot)
 async def get_track_snapshot(track_id: str, request: Request):
-    """
-    Fetches an optimized, lightweight snapshot of a track specifically for frontend playback.
-    """
     client = request.app.state.client
     token = await get_spotify_token(client)
-    headers = {"Authorization": f"Bearer {token}"}
+    
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+    }
     
     clean_id = str(track_id).strip()
-    
     res = await client.get(f"{SPOTIFY_API_BASE}/tracks/{clean_id}?market=US", headers=headers)
     
     if res.status_code != 200:
