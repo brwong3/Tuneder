@@ -49,7 +49,7 @@ export default function TabLayout() {
         options={{
           title: "Discovery",
           tabBarIcon: ({ color }) => (
-            <IconSymbol size={26} name="flame.fill" color={color} />
+            <IconSymbol size={26} name="discovery-fire" color={color} />
           ),
         }}
       />
@@ -58,7 +58,7 @@ export default function TabLayout() {
         options={{
           title: "Matches",
           tabBarIcon: ({ color }) => (
-            <IconSymbol size={26} name="music.note.list" color={color} />
+            <IconSymbol size={26} name="library-music" color={color} />
           ),
         }}
       />
@@ -67,7 +67,7 @@ export default function TabLayout() {
         options={{
           title: "Profile",
           tabBarIcon: ({ color }) => (
-            <IconSymbol size={26} name="person.crop.circle.fill" color={color} />
+            <IconSymbol size={26} name="profile-person" color={color} />
           ),
         }}
       />

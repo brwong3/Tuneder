@@ -96,7 +96,7 @@ export default function ProfileScreen() {
           >
             <View style={styles.tabLeft}>
               <IconSymbol size={22} name="sun.max.fill" color={colors.primary} />
-              <Text style={styles.tabText}>Lighting</Text>
+              <Text style={styles.tabText}>Dark Mode</Text>
             </View>
             <View style={[styles.customToggle, { backgroundColor: isDarkMode ? colors.primary : colors.border }]}>
               <View style={[styles.toggleThumb, { transform: [{ translateX: isDarkMode ? 24 : 0 }] }]}>
@@ -280,7 +280,7 @@ const createStyles = (theme: any, isDarkMode: boolean) => StyleSheet.create({
   drawerTitle: { color: theme.text, fontSize: 24, fontWeight: "900", textAlign: 'center', marginBottom: 24 },
   statsRow: { flexDirection: "row", gap: 12, marginBottom: 12 },
   statCard: { flex: 1, backgroundColor: theme.chipBg, paddingVertical: 24, borderRadius: 24, alignItems: "center" },
-  vibeBanner: { flex: 0, width: '100%', marginBottom: 24 },
+  vibeBanner: { width: '100%', marginBottom: 42 },
   statValue: { color: theme.text, fontSize: 24, fontWeight: "900" },
   statLabel: { color: theme.subText, fontSize: 11, fontWeight: "700", textTransform: "uppercase", marginTop: 4 },
 
